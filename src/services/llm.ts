@@ -1,6 +1,6 @@
-import { ChatGroq } from "@langchain/groq";
-import type { BaseMessage } from "@langchain/core/messages";
 import type { StructuredOutputMethodOptions } from "@langchain/core/language_models/base";
+import type { BaseMessage } from "@langchain/core/messages";
+import { ChatGroq } from "@langchain/groq";
 
 interface LlmConfig {
 	apiKey?: string;

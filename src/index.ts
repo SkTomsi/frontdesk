@@ -1,6 +1,6 @@
 import * as readline from "node:readline";
 import { sampleDocuments } from "./data/sample-docs";
-import { Llm } from "./llm";
+import { Llm } from "./services/llm";
 import { SupportAnswer } from "./schemas";
 import { EmbeddingService } from "./services/embeddings";
 import { TextSplitter } from "./services/text-splitter";
