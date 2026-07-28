@@ -11,24 +11,20 @@ export interface SplitDocument {
 }
 
 export class TextSplitter {
-	private chunkSize: number;
-	private chunkOverlap: number;
+	private splitter: RecursiveCharacterTextSplitter;
 
 	constructor(config: TextSplitterConfig = {}) {
-		this.chunkSize = config.chunkSize ?? 500;
-		this.chunkOverlap = config.chunkOverlap ?? 50;
+		this.splitter = new RecursiveCharacterTextSplitter({
+			chunkSize: config.chunkSize ?? 500,
+			chunkOverlap: config.chunkOverlap ?? 50,
+		});
 	}
 
 	async splitDocuments(docs: SplitDocument[]): Promise<SplitDocument[]> {
-		const splitter = new RecursiveCharacterTextSplitter({
-			chunkSize: this.chunkSize,
-			chunkOverlap: this.chunkOverlap,
-		});
-
 		const chunks: SplitDocument[] = [];
 
 		for (const doc of docs) {
-			const splits = await splitter.splitText(doc.text);
+			const splits = await this.splitter.splitText(doc.text);
 			for (const split of splits) {
 				chunks.push({ text: split, metadata: doc.metadata });
 			}
@@ -38,10 +34,6 @@ export class TextSplitter {
 	}
 
 	async splitText(text: string): Promise<string[]> {
-		const splitter = new RecursiveCharacterTextSplitter({
-			chunkSize: this.chunkSize,
-			chunkOverlap: this.chunkOverlap,
-		});
-		return splitter.splitText(text);
+		return this.splitter.splitText(text);
 	}
 }

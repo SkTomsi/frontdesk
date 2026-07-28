@@ -1,8 +1,10 @@
 import * as readline from "node:readline";
+
 import { sampleDocuments } from "./data/sample-docs";
-import { Llm } from "./services/llm";
+import { supportPrompt } from "./prompts";
 import { SupportAnswer } from "./schemas";
 import { EmbeddingService } from "./services/embeddings";
+import { Llm } from "./services/llm";
 import { TextSplitter } from "./services/text-splitter";
 import { VectorStore } from "./services/vector-store";
 
@@ -10,6 +12,10 @@ const llm = new Llm();
 const embeddings = new EmbeddingService({ model: "gemini-embedding-2" });
 const splitter = new TextSplitter({ chunkSize: 300, chunkOverlap: 50 });
 const vectorStore = new VectorStore();
+
+const structuredModel = llm.withStructuredOutput(SupportAnswer, {
+	name: "support-answer",
+});
 
 async function ingestDocuments() {
 	await vectorStore.load();
@@ -50,19 +56,7 @@ async function answerQuestion(question: string) {
 		)
 		.join("\n\n");
 
-	const prompt = `You are Northwind support. Answer using ONLY the context below.
-If the context doesn't cover the question, say so and set needsHumanReview true.
-
-CONTEXT:
-${context}
-
-QUESTION:
-${question}`;
-
-	const structuredModel = llm.withStructuredOutput(SupportAnswer, {
-		name: "support-answer",
-	});
-
+	const prompt = supportPrompt({ context, question });
 	return structuredModel.invoke(prompt);
 }
 
@@ -96,7 +90,7 @@ async function main() {
 				console.log(`  Sources: ${answer.citedSources.join(", ")}`);
 				console.log(`  Needs review: ${answer.needsHumanReview}\n`);
 			} catch (err) {
-				console.error("Error:", err);
+				console.error("Error:", err instanceof Error ? err.message : err);
 			}
 
 			prompt();

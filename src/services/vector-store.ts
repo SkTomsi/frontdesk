@@ -38,10 +38,22 @@ export class VectorStore {
 	}
 
 	addDocuments(docs: StoredDocument[]) {
-		this.documents.push(...docs);
+		const existingIds = new Set(this.documents.map((d) => d.id));
+		for (const doc of docs) {
+			if (existingIds.has(doc.id)) {
+				this.documents = this.documents.filter((d) => d.id !== doc.id);
+			}
+			this.documents.push(doc);
+			existingIds.add(doc.id);
+		}
 	}
 
-	similaritySearch(queryEmbedding: number[], topK: number = 3): SearchResult[] {
+	similaritySearch(
+		queryEmbedding: number[],
+		topK: number = 3,
+	): SearchResult[] {
+		if (this.documents.length === 0) return [];
+
 		return this.documents
 			.map((doc) => ({
 				document: doc,
