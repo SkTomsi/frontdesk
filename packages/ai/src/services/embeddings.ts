@@ -1,4 +1,5 @@
 import { GoogleGenerativeAIEmbeddings } from "@langchain/google-genai";
+import { TaskType } from "@google/generative-ai";
 
 interface EmbeddingServiceConfig {
 	apiKey?: string;
@@ -6,21 +7,32 @@ interface EmbeddingServiceConfig {
 }
 
 export class EmbeddingService {
-	private client: GoogleGenerativeAIEmbeddings;
+	private queryClient: GoogleGenerativeAIEmbeddings;
+	private docClient: GoogleGenerativeAIEmbeddings;
 
 	constructor(config: EmbeddingServiceConfig = {}) {
-		this.client = new GoogleGenerativeAIEmbeddings({
-			apiKey: config.apiKey ?? process.env.GOOGLE_API_KEY,
-			modelName: config.model ?? "embedding-001",
+		const apiKey = config.apiKey ?? process.env.GOOGLE_API_KEY;
+		const modelName = config.model ?? "gemini-embedding-2";
+
+		this.queryClient = new GoogleGenerativeAIEmbeddings({
+			apiKey,
+			modelName,
+			taskType: TaskType.RETRIEVAL_QUERY,
+		});
+
+		this.docClient = new GoogleGenerativeAIEmbeddings({
+			apiKey,
+			modelName,
+			taskType: TaskType.RETRIEVAL_DOCUMENT,
 		});
 	}
 
 	async embedDocuments(texts: string[]): Promise<number[][]> {
-		return withRetry(() => this.client.embedDocuments(texts));
+		return withRetry(() => this.docClient.embedDocuments(texts));
 	}
 
 	async embedQuery(text: string): Promise<number[]> {
-		return withRetry(() => this.client.embedQuery(text));
+		return withRetry(() => this.queryClient.embedQuery(text));
 	}
 }
 

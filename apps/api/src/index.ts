@@ -69,6 +69,7 @@ async function streamAnswer(
 			source: r.document.metadata.title as string,
 			chunkSize: r.document.content.length,
 			totalChars,
+			score: r.score,
 		});
 	}
 

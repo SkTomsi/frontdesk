@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@frontdesk/db": "workspace:*",
+    "@google/generative-ai": "^0.24.1",
     "@langchain/core": "^1.2.3",
     "@langchain/google-genai": "^2.2.0",
     "@langchain/groq": "^1.3.1",

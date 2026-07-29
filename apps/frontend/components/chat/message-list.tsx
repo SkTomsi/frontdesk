@@ -17,11 +17,16 @@ import {
 	MessageScrollerViewport,
 } from "@/components/ui/message-scroller";
 
+export interface SourceInfo {
+	title: string;
+	score: number;
+}
+
 export interface MessageData {
 	id: string;
 	role: "user" | "assistant";
 	content: string;
-	sources?: string[];
+	sources?: SourceInfo[];
 }
 
 interface MessageListProps {

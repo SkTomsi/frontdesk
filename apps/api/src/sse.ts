@@ -1,5 +1,5 @@
 export type StreamEvent =
-	| { type: "meta"; source: string; chunkSize: number; totalChars: number }
+	| { type: "meta"; source: string; chunkSize: number; totalChars: number; score: number }
 	| { type: "assistant_delta"; text: string }
 	| { type: "done" }
 	| { type: "error"; message: string };

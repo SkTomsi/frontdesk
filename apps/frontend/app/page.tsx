@@ -60,7 +60,7 @@ export default function Home() {
 						break;
 					case "meta":
 						update((prev) => ({
-							sources: [...(prev.sources || []), ev.source],
+							sources: [...(prev.sources || []), { title: ev.source, score: ev.score }],
 						}));
 						break;
 					case "error":
