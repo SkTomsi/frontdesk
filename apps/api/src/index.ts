@@ -45,8 +45,24 @@ async function streamAnswer(
 		vectorStore,
 	);
 
+	const llmStream = await llm.stream(supportPrompt({ context, question }));
+
+	let answer = "";
+	for await (const chunk of llmStream) {
+		const text = chunk.content as string;
+		if (text) {
+			answer += text;
+			send(controller, { type: "assistant_delta", text });
+		}
+	}
+
+	const citedSources = results.filter((r) => {
+		const title = r.document.metadata.title as string;
+		return answer.includes(title);
+	});
+
 	let totalChars = 0;
-	for (const r of results) {
+	for (const r of citedSources) {
 		totalChars += r.document.content.length;
 		send(controller, {
 			type: "meta",
@@ -54,12 +70,6 @@ async function streamAnswer(
 			chunkSize: r.document.content.length,
 			totalChars,
 		});
-	}
-
-	const llmStream = await llm.stream(supportPrompt({ context, question }));
-	for await (const chunk of llmStream) {
-		const text = chunk.content as string;
-		if (text) send(controller, { type: "assistant_delta", text });
 	}
 
 	send(controller, { type: "done" });
