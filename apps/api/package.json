@@ -1,0 +1,15 @@
+{
+  "name": "@frontdesk/api",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "dev": "bun --hot ./src/index.ts"
+  },
+  "dependencies": {
+    "@frontdesk/ai": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "typescript": "^5"
+  }
+}

@@ -1,8 +1,14 @@
 ---
-description: Use Bun instead of Node.js, npm, pnpm, or vite.
+description: Monorepo — Bun workspace with packages/api (Bun server) and packages/app (Next.js frontend).
 globs: "*.ts, *.tsx, *.html, *.css, *.js, *.jsx, package.json"
 alwaysApply: false
 ---
+
+This is a Bun workspace monorepo.
+
+- `packages/ai` — Shared AI library (RAG pipeline, pgvector, Drizzle ORM)
+- `apps/api` — Bun HTTP server (wraps `packages/ai`, serves `/api/ask`)
+- `apps/frontend` — Next.js frontend (Tailwind v4, shadcn, react-query)
 
 Default to using Bun instead of Node.js.
 
