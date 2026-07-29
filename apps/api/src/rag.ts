@@ -18,7 +18,6 @@ export async function retrieveContext(
 ): Promise<RetrievalResult> {
 	const queryEmbedding = await embeddings.embedQuery(question);
 	const results = await vectorStore.similaritySearch(queryEmbedding, 3);
-	console.log(results);
 	const relevant = results.filter((r) => r.score >= SIMILARITY_THRESHOLD);
 	const context = relevant
 		.map((r) => {
@@ -26,6 +25,5 @@ export async function retrieveContext(
 			return `[${label}] (score: ${r.score.toFixed(3)})\n${r.document.content}`;
 		})
 		.join("\n\n");
-	console.log(context);
 	return { results: relevant, context };
 }

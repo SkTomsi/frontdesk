@@ -1,11 +1,11 @@
 export { config } from "./config";
-export { SupportAnswer } from "./schemas";
-export type { SupportAnswer as SupportAnswerType } from "./schemas";
-export { supportPrompt } from "./prompts";
-export type { PromptVariables } from "./prompts";
 export { sampleDocuments } from "./data/sample-docs";
+export type { PromptVariables } from "./prompts";
+export { supportPrompt } from "./prompts";
+export type { SupportAnswer as SupportAnswerType } from "./schemas";
+export { SupportAnswer } from "./schemas";
 export { EmbeddingService } from "./services/embeddings";
 export { Llm } from "./services/llm";
 export { TextSplitter } from "./services/text-splitter";
-export { VectorStore } from "./services/vector-store";
 export type { SearchResult, StoredDocument } from "./services/vector-store";
+export { VectorStore } from "./services/vector-store";

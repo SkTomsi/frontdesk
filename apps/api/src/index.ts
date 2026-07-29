@@ -7,14 +7,17 @@ import {
 	TextSplitter,
 	VectorStore,
 } from "@frontdesk/ai";
-import { send, CORS_HEADERS, STREAM_HEADERS } from "./sse";
 import { retrieveContext } from "./rag";
+import { CORS_HEADERS, STREAM_HEADERS, send } from "./sse";
 
 const PORT = 3003;
 
 const llm = new Llm({ model: config.LLM_MODEL });
 const embeddings = new EmbeddingService({ model: config.EMBEDDING_MODEL });
-const splitter = new TextSplitter({ chunkSize: config.CHUNK_SIZE, chunkOverlap: config.CHUNK_OVERLAP });
+const splitter = new TextSplitter({
+	chunkSize: config.CHUNK_SIZE,
+	chunkOverlap: config.CHUNK_OVERLAP,
+});
 const vectorStore = new VectorStore();
 
 await vectorStore.initialize();
@@ -24,18 +27,33 @@ if (count === 0) {
 	const vectors = await embeddings.embedDocuments(chunks.map((c) => c.text));
 	await vectorStore.addDocuments(
 		chunks.map((chunk, i) => ({
-			id: `doc-${i}`, content: chunk.text, embedding: vectors[i]!, metadata: chunk.metadata,
+			id: `doc-${i}`,
+			content: chunk.text,
+			embedding: vectors[i]!,
+			metadata: chunk.metadata,
 		})),
 	);
 }
 
-async function streamAnswer(question: string, controller: ReadableStreamDefaultController) {
-	const { results, context } = await retrieveContext(question, embeddings, vectorStore);
+async function streamAnswer(
+	question: string,
+	controller: ReadableStreamDefaultController,
+) {
+	const { results, context } = await retrieveContext(
+		question,
+		embeddings,
+		vectorStore,
+	);
 
 	let totalChars = 0;
 	for (const r of results) {
 		totalChars += r.document.content.length;
-		send(controller, { type: "meta", source: r.document.metadata.title as string, chunkSize: r.document.content.length, totalChars });
+		send(controller, {
+			type: "meta",
+			source: r.document.metadata.title as string,
+			chunkSize: r.document.content.length,
+			totalChars,
+		});
 	}
 
 	const llmStream = await llm.stream(supportPrompt({ context, question }));
@@ -61,7 +79,10 @@ Bun.serve({
 						try {
 							await streamAnswer(question, controller);
 						} catch {
-							send(controller, { type: "error", message: "Something went wrong" });
+							send(controller, {
+								type: "error",
+								message: "Something went wrong",
+							});
 						} finally {
 							controller.close();
 						}

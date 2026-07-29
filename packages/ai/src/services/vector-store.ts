@@ -1,6 +1,6 @@
 import { desc, sql } from "drizzle-orm";
-import { createDb } from "../db";
-import { documents } from "../db/schema";
+import { createDb } from "@frontdesk/db";
+import { documents } from "@frontdesk/db/schema";
 
 export interface StoredDocument {
 	id: string;
