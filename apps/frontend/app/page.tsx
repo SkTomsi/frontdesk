@@ -1,23 +1,37 @@
 "use client";
 
 import { useMutation } from "@tanstack/react-query";
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Bubble, BubbleContent } from "@/components/ui/bubble";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Marker, MarkerContent, MarkerIcon } from "@/components/ui/marker";
+import {
+	Message,
+	MessageAvatar,
+	MessageContent,
+} from "@/components/ui/message";
+import {
+	MessageScroller,
+	MessageScrollerButton,
+	MessageScrollerContent,
+	MessageScrollerItem,
+	MessageScrollerProvider,
+	MessageScrollerViewport,
+} from "@/components/ui/message-scroller";
+import { Spinner } from "@/components/ui/spinner";
 
 interface Source {
 	title: string;
 	score: number;
 }
 
-interface Message {
+interface MessageData {
+	id: string;
 	role: "user" | "assistant";
 	content: string;
 	sources?: Source[];
-	confidence?: string;
 }
 
 interface AskResponse {
@@ -28,6 +42,8 @@ interface AskResponse {
 	citedSources: string[];
 	sources: Source[];
 }
+
+let nextId = 1;
 
 function BotAvatar() {
 	return (
@@ -49,22 +65,9 @@ function UserAvatar() {
 	);
 }
 
-function ShimmerBubble() {
-	return (
-		<div className="flex items-start gap-3">
-			<BotAvatar />
-			<div className="space-y-2 flex-1 max-w-[80%]">
-				<Skeleton className="h-4 w-3/4" />
-				<Skeleton className="h-4 w-1/2" />
-				<Skeleton className="h-4 w-2/3" />
-			</div>
-		</div>
-	);
-}
-
 function SourceBadges({ sources }: { sources: Source[] }) {
 	return (
-		<div className="flex flex-wrap gap-1.5 mt-2 pt-2 border-t border-border/50">
+		<div className="flex flex-wrap gap-1.5">
 			{sources.map((s, i) => (
 				<span
 					key={i}
@@ -74,35 +77,6 @@ function SourceBadges({ sources }: { sources: Source[] }) {
 					{s.title}
 				</span>
 			))}
-		</div>
-	);
-}
-
-function MessageBubble({ message }: { message: Message }) {
-	const isUser = message.role === "user";
-	return (
-		<div
-			className={`flex items-start gap-3 ${isUser ? "flex-row-reverse" : ""}`}
-		>
-			{isUser ? <UserAvatar /> : <BotAvatar />}
-			<div
-				className={`max-w-[80%] space-y-1 ${isUser ? "items-end" : "items-start"}`}
-			>
-				<div
-					className={`rounded-2xl px-4 py-2.5 ${
-						isUser
-							? "bg-primary text-primary-foreground rounded-br-md"
-							: "bg-muted rounded-bl-md"
-					}`}
-				>
-					<p className="whitespace-pre-wrap text-sm leading-relaxed">
-						{message.content}
-					</p>
-				</div>
-				{message.sources && message.sources.length > 0 && (
-					<SourceBadges sources={message.sources} />
-				)}
-			</div>
 		</div>
 	);
 }
@@ -134,10 +108,22 @@ function EmptyState() {
 	);
 }
 
+function LoadingMessage() {
+	return (
+		<MessageScrollerItem>
+			<Marker role="status">
+				<MarkerIcon>
+					<Spinner />
+				</MarkerIcon>
+				<MarkerContent className="shimmer">Thinking...</MarkerContent>
+			</Marker>
+		</MessageScrollerItem>
+	);
+}
+
 export default function Home() {
-	const [messages, setMessages] = useState<Message[]>([]);
+	const [messages, setMessages] = useState<MessageData[]>([]);
 	const [input, setInput] = useState("");
-	const scrollRef = useRef<HTMLDivElement>(null);
 
 	const askMutation = useMutation({
 		mutationFn: async (question: string): Promise<AskResponse> => {
@@ -152,38 +138,30 @@ export default function Home() {
 			setMessages((prev) => [
 				...prev,
 				{
+					id: String(nextId++),
 					role: "assistant",
 					content: data.answer,
 					sources: data.sources,
-					confidence: data.confidence,
 				},
 			]);
 		},
 	});
 
-	useEffect(() => {
-		if (scrollRef.current) {
-			const viewport = scrollRef.current.querySelector(
-				"[data-radix-scroll-area-viewport]",
-			);
-			if (viewport) {
-				viewport.scrollTop = viewport.scrollHeight;
-			}
-		}
-	}, [messages, askMutation.isPending]);
-
 	function handleSubmit(e: React.FormEvent) {
 		e.preventDefault();
 		if (!input.trim() || askMutation.isPending) return;
-		setMessages((prev) => [...prev, { role: "user", content: input }]);
+		setMessages((prev) => [
+			...prev,
+			{ id: String(nextId++), role: "user", content: input },
+		]);
 		askMutation.mutate(input);
 		setInput("");
 	}
 
 	return (
-		<div className="max-w-3xl mx-auto h-dvh flex flex-col">
+		<div className="flex h-dvh flex-col">
 			<header className="border-b px-4 py-3 shrink-0">
-				<div className="flex items-center gap-3">
+				<div className="flex items-center gap-3 max-w-3xl mx-auto">
 					<div className="size-9 rounded-lg bg-primary flex items-center justify-center">
 						<svg
 							className="size-5 text-primary-foreground"
@@ -206,15 +184,45 @@ export default function Home() {
 				</div>
 			</header>
 
-			<ScrollArea ref={scrollRef} className="flex-1 px-4 py-4">
-				{messages.length === 0 && <EmptyState />}
-				<div className="space-y-4">
-					{messages.map((msg, i) => (
-						<MessageBubble key={i} message={msg} />
-					))}
-					{askMutation.isPending && <ShimmerBubble />}
-				</div>
-			</ScrollArea>
+			<MessageScrollerProvider autoScroll scrollPreviousItemPeek={64}>
+				<MessageScroller className="flex-1">
+					<MessageScrollerViewport className="max-w-3xl mx-auto py-8">
+						<MessageScrollerContent>
+							{messages.length === 0 && (
+								<MessageScrollerItem>
+									<EmptyState />
+								</MessageScrollerItem>
+							)}
+							{messages.map((msg) => (
+								<MessageScrollerItem
+									key={msg.id}
+									messageId={msg.id}
+									scrollAnchor={msg.role === "user"}
+                  className="border-2 "
+								>
+									<Message align={msg.role === "user" ? "end" : "start"}>
+										<MessageAvatar>
+											{msg.role === "user" ? <UserAvatar /> : <BotAvatar />}
+										</MessageAvatar>
+										<MessageContent>
+											<Bubble
+												variant={msg.role === "user" ? "default" : "secondary"}
+											>
+												<BubbleContent>{msg.content}</BubbleContent>
+											</Bubble>
+											{msg.sources && msg.sources.length > 0 && (
+												<SourceBadges sources={msg.sources} />
+											)}
+										</MessageContent>
+									</Message>
+								</MessageScrollerItem>
+							))}
+							{askMutation.isPending && <LoadingMessage />}
+						</MessageScrollerContent>
+					</MessageScrollerViewport>
+					<MessageScrollerButton />
+				</MessageScroller>
+			</MessageScrollerProvider>
 
 			<div className="border-t p-4 shrink-0">
 				<form onSubmit={handleSubmit} className="flex gap-2 max-w-3xl mx-auto">
