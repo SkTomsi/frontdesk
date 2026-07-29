@@ -1,7 +1,8 @@
 export function SourceBadges({ sources }: { sources: string[] }) {
+	const unique = [...new Set(sources)];
 	return (
 		<div className="flex flex-wrap gap-1.5">
-			{sources.map((s) => (
+			{unique.map((s) => (
 				<span
 					key={s}
 					className="inline-flex items-center gap-1 rounded-full bg-secondary/50 px-2 py-0.5 text-[11px] text-muted-foreground"
