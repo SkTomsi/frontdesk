@@ -1,11 +1,17 @@
 {
   "name": "frontdesk",
   "private": true,
+  "devEngines": {
+    "packageManager": {
+      "name": "bun",
+      "version": "1.2.0"
+    }
+  },
   "workspaces": ["apps/*", "packages/*"],
   "scripts": {
     "dev:api": "bun --hot ./apps/api/src/index.ts",
     "dev:app": "bun --cwd apps/frontend dev",
-    "dev": "bun run dev:api & bun run dev:app",
+    "dev": "turbo run dev",
     "db:generate": "bun --cwd packages/db db:generate",
     "db:migrate": "bun --cwd packages/db db:migrate",
     "db:push": "bun --cwd packages/db db:push",

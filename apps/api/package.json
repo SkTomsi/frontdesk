@@ -3,7 +3,8 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "dev": "bun --hot ./src/index.ts"
+    "dev": "bun --hot --env-file ../../.env ./src/index.ts",
+    "check-types": "tsc --noEmit"
   },
   "dependencies": {
     "@frontdesk/ai": "workspace:*"

@@ -9,6 +9,7 @@
     "./schema": "./src/schema.ts"
   },
   "scripts": {
+    "check-types": "tsc --noEmit",
     "db:generate": "bun --bun drizzle-kit generate",
     "db:migrate": "bun --bun drizzle-kit migrate",
     "db:push": "bun --bun drizzle-kit push",
