@@ -207,7 +207,9 @@ export default function Home() {
 											<Bubble
 												variant={msg.role === "user" ? "default" : "secondary"}
 											>
-												<BubbleContent>{msg.content}</BubbleContent>
+												<BubbleContent className="rounded-2xl p-4 text-sm">
+													{msg.content}
+												</BubbleContent>
 											</Bubble>
 											{msg.sources && msg.sources.length > 0 && (
 												<SourceBadges sources={msg.sources} />
