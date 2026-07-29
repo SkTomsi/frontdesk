@@ -162,6 +162,10 @@ The `POST /api/ask` endpoint accepts `{ question: string }` and streams response
 - `done` — stream complete
 - `error` — something went wrong
 
+## Product Vision
+
+See [docs/final-product.md](docs/final-product.md) for the full product vision — not a chatbot, but an autonomous operations layer for the enterprise. Designed for FDE roles.
+
 ## Roadmap
 
 See [docs/roadmap.md](docs/roadmap.md) for the full phased plan.
