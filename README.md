@@ -17,7 +17,7 @@ Frontdesk is a RAG (Retrieval-Augmented Generation) pipeline that:
 - **Runtime:** Bun
 - **LLM Framework:** LangChain.js
 - **LLM Provider:** Groq (`openai/gpt-oss-120b`)
-- **Embeddings:** Google Gemini (`embedding-001`, 768 dimensions)
+- **Embeddings:** Google Gemini (`embedding-2`, 768 dimensions)
 - **Schema Validation:** Zod v4
 - **Language:** TypeScript (strict mode)
 
