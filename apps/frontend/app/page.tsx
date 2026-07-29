@@ -186,7 +186,7 @@ export default function Home() {
 
 			<MessageScrollerProvider autoScroll scrollPreviousItemPeek={64}>
 				<MessageScroller className="flex-1">
-					<MessageScrollerViewport className="max-w-3xl mx-auto py-8">
+					<MessageScrollerViewport className="max-w-3xl mx-auto py-8 px-4">
 						<MessageScrollerContent>
 							{messages.length === 0 && (
 								<MessageScrollerItem>
@@ -198,7 +198,6 @@ export default function Home() {
 									key={msg.id}
 									messageId={msg.id}
 									scrollAnchor={msg.role === "user"}
-                  className="border-2 "
 								>
 									<Message align={msg.role === "user" ? "end" : "start"}>
 										<MessageAvatar>
