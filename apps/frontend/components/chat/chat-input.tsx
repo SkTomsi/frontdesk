@@ -29,7 +29,7 @@ export function ChatInput({
 					disabled={disabled}
 					className="rounded-xl px-5 h-full text-sm"
 				>
-					{disabled ? "Streaming..." : "Send"}
+					{disabled ? "..." : "Send"}
 				</Button>
 			</form>
 		</div>
