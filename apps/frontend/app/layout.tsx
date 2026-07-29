@@ -21,7 +21,7 @@ export default function RootLayout({
 }) {
 	return (
 		<html lang="en" className={cn("font-mono", jetbrainsMono.variable)}>
-			<body>
+			<body className="max-w-3xl mx-auto">
 				<Providers>{children}</Providers>
 			</body>
 		</html>

@@ -1,94 +1,74 @@
-import type { SearchResult } from "@frontdesk/ai";
 import {
 	config,
 	EmbeddingService,
 	Llm,
-	SupportAnswer,
 	sampleDocuments,
 	supportPrompt,
 	TextSplitter,
 	VectorStore,
 } from "@frontdesk/ai";
+import { send, CORS_HEADERS, STREAM_HEADERS } from "./sse";
+import { retrieveContext } from "./rag";
 
 const PORT = 3003;
 
 const llm = new Llm({ model: config.LLM_MODEL });
 const embeddings = new EmbeddingService({ model: config.EMBEDDING_MODEL });
-const splitter = new TextSplitter({
-	chunkSize: config.CHUNK_SIZE,
-	chunkOverlap: config.CHUNK_OVERLAP,
-});
+const splitter = new TextSplitter({ chunkSize: config.CHUNK_SIZE, chunkOverlap: config.CHUNK_OVERLAP });
 const vectorStore = new VectorStore();
 
-const structuredModel = llm.withStructuredOutput(SupportAnswer, {
-	name: "support-answer",
-});
-
-async function ingestDocuments() {
-	await vectorStore.initialize();
-
-	const count = await vectorStore.count();
-	if (count > 0) return;
-
+await vectorStore.initialize();
+const count = await vectorStore.count();
+if (count === 0) {
 	const chunks = await splitter.splitDocuments(sampleDocuments);
 	const vectors = await embeddings.embedDocuments(chunks.map((c) => c.text));
-
 	await vectorStore.addDocuments(
 		chunks.map((chunk, i) => ({
-			id: `doc-${i}`,
-			content: chunk.text,
-			embedding: vectors[i]!,
-			metadata: chunk.metadata,
+			id: `doc-${i}`, content: chunk.text, embedding: vectors[i]!, metadata: chunk.metadata,
 		})),
 	);
 }
 
-async function answerQuestion(question: string) {
-	const queryEmbedding = await embeddings.embedQuery(question);
-	const results = await vectorStore.similaritySearch(queryEmbedding, 3);
+async function streamAnswer(question: string, controller: ReadableStreamDefaultController) {
+	const { results, context } = await retrieveContext(question, embeddings, vectorStore);
 
-	const context = results
-		.map((r) => {
-			const label = (r.document.metadata.title as string) || r.document.id;
-			return `[${label}] (score: ${r.score.toFixed(3)})\n${r.document.content}`;
-		})
-		.join("\n\n");
+	let totalChars = 0;
+	for (const r of results) {
+		totalChars += r.document.content.length;
+		send(controller, { type: "meta", source: r.document.metadata.title as string, chunkSize: r.document.content.length, totalChars });
+	}
 
-	const prompt = supportPrompt({ context, question });
-	const answer = await structuredModel.invoke(prompt);
-	return { answer, results };
+	const llmStream = await llm.stream(supportPrompt({ context, question }));
+	for await (const chunk of llmStream) {
+		const text = chunk.content as string;
+		if (text) send(controller, { type: "assistant_delta", text });
+	}
+
+	send(controller, { type: "done" });
 }
-
-function sourcesPayload(results: SearchResult[]) {
-	return results.map((r) => ({
-		title: r.document.metadata.title as string,
-		score: r.score,
-	}));
-}
-
-await ingestDocuments();
 
 Bun.serve({
 	port: PORT,
 	routes: {
-		"/health": {
-			GET: () => new Response("OK", { status: 200 }),
-		},
+		"/health": { GET: () => new Response("OK", { status: 200 }) },
 		"/api/ask": {
+			OPTIONS: () => new Response(null, { headers: CORS_HEADERS }),
 			POST: async (req) => {
 				const { question } = (await req.json()) as { question: string };
-				const { answer, results } = await answerQuestion(question);
-				return new Response(
-					JSON.stringify({
-						answer: answer.answer,
-						confidence: answer.confidence,
-						needsHumanReview: answer.needsHumanReview,
-						score: answer.score,
-						citedSources: answer.citedSources,
-						sources: sourcesPayload(results),
-					}),
-					{ headers: { "Content-Type": "application/json" } },
-				);
+
+				const body = new ReadableStream({
+					async start(controller) {
+						try {
+							await streamAnswer(question, controller);
+						} catch {
+							send(controller, { type: "error", message: "Something went wrong" });
+						} finally {
+							controller.close();
+						}
+					},
+				});
+
+				return new Response(body, { headers: STREAM_HEADERS });
 			},
 		},
 	},

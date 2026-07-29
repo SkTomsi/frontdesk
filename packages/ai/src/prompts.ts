@@ -7,7 +7,7 @@ export const supportPrompt = ({
 	context,
 	question,
 }: PromptVariables): string => `You are Northwind support. Answer using ONLY the context below.
-If the context doesn't cover the question, say so and set needsHumanReview true.
+If the context doesn't cover the question, say so.
 
 CONTEXT:
 ${context}

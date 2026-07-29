@@ -1,4 +1,3 @@
-import type { StructuredOutputMethodOptions } from "@langchain/core/language_models/base";
 import type { BaseMessage } from "@langchain/core/messages";
 import { ChatGroq } from "@langchain/groq";
 
@@ -23,10 +22,8 @@ export class Llm {
 		return this.client.invoke(input);
 	}
 
-	withStructuredOutput(
-		schema: Parameters<ChatGroq["withStructuredOutput"]>[0],
-		config?: StructuredOutputMethodOptions,
-	) {
-		return this.client.withStructuredOutput(schema, config);
+	async stream(input: string | BaseMessage[]) {
+		const stream = await this.client.stream(input);
+		return stream;
 	}
 }
