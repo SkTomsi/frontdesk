@@ -27,21 +27,41 @@ Frontdesk is a RAG (Retrieval-Augmented Generation) platform where:
 ## Project Structure
 
 ```
-src/
-├── index.ts              — Entry point with interactive REPL
-├── prompts.ts            — Prompt templates
-├── schemas.ts            — Structured output schema (Zod)
-├── config.ts             — Environment configuration
-├── data/
-│   └── sample-docs.ts    — Sample documentation for ingestion
-├── db/
-│   ├── index.ts          — Drizzle client setup
-│   └── schema.ts         — Database schema (documents table)
-└── services/
-    ├── llm.ts            — LLM service (Groq)
-    ├── embeddings.ts     — Embedding service (Gemini)
-    ├── text-splitter.ts  — Document chunking (LangChain)
-    └── vector-store.ts   — pgvector-backed vector store via Drizzle
+frontdesk/
+├── apps/
+│   ├── api/              — Bun HTTP server (port 3003)
+│   │   └── src/
+│   │       ├── index.ts  — Server entrypoint (Bun.serve)
+│   │       ├── rag.ts    — Retrieval pipeline
+│   │       └── sse.ts    — SSE streaming helpers
+│   └── frontend/         — Next.js 15 App Router (Turbopack)
+│       ├── app/          — Pages and layout
+│       ├── components/   — Chat UI + 60 shadcn components
+│       └── lib/          — SSE parser, utils
+├── packages/
+│   ├── ai/               — Shared AI library
+│   │   └── src/
+│   │       ├── config.ts
+│   │       ├── prompts.ts
+│   │       ├── schemas.ts
+│   │       ├── data/sample-docs.ts
+│   │       └── services/
+│   │           ├── embeddings.ts
+│   │           ├── llm.ts
+│   │           ├── text-splitter.ts
+│   │           └── vector-store.ts
+│   └── db/               — Database schema + Drizzle client
+│       ├── src/
+│       │   ├── index.ts  — Client factory
+│       │   └── schema.ts — Documents table (pgvector)
+│       └── drizzle/      — Migration files
+├── docs/
+│   ├── architecture.md   — Current architecture overview
+│   ├── roadmap.md        — Phased plan
+│   └── specs/            — Feature specs
+├── docker-compose.yml    — TimescaleDB with pgvector
+├── turbo.json            — Turbo repo orchestration
+└── package.json          — Bun workspace root
 ```
 
 ## Getting Started
@@ -77,8 +97,6 @@ DATABASE_URL='postgres://frontdesk:frontdesk@localhost:5433/frontdesk'
 
 ### 4. Push the database schema
 
-The app auto-creates the schema on first run, but you can also push explicitly:
-
 ```bash
 bun run db:push
 ```
@@ -86,8 +104,10 @@ bun run db:push
 ### 5. Run
 
 ```bash
-bun src/index.ts
+bun run dev
 ```
+
+This starts both the API server (port 3003, with hot reload) and the Next.js frontend (Turbopack) concurrently via Turbo.
 
 First run ingests sample documents, generates embeddings, and stores them in PostgreSQL. Subsequent runs load from the database.
 
@@ -105,8 +125,13 @@ bun run db:up         # Upgrade to latest
 
 ## Development
 
-To connect the database for inspection with pgAdmin:
+The API server runs on `http://localhost:3003`. The frontend runs on `http://localhost:3000` with API requests proxied via Next.js rewrites.
 
+Hot reloading:
+- **API**: `bun --hot --no-clear-screen` restarts on file changes (preserves terminal output)
+- **Frontend**: `next dev --turbopack` for sub-second HMR
+
+Database connection (pgAdmin):
 - **Host:** localhost
 - **Port:** 5433
 - **Username:** frontdesk
@@ -121,7 +146,21 @@ To connect the database for inspection with pgAdmin:
 - **Retry with backoff** — embedding API calls handle rate limits gracefully
 - **Drizzle ORM** — type-safe database access with Bun SQL driver, replaces raw SQL for readability
 - **pgvector with TimescaleDB** — production-grade vector store with full PostgreSQL ecosystem
+- **SSE over WebSocket** — simpler for unidirectional streaming; no bidirectional messaging needed
 - **Self-hosted** — users deploy on their own infrastructure via Docker Compose, no vendor lock-in
+
+## API Endpoints
+
+| Method | Path | Description |
+|---|---|---|
+| GET | `/health` | Health check |
+| POST | `/api/ask` | Ask a question (returns SSE stream) |
+
+The `POST /api/ask` endpoint accepts `{ question: string }` and streams responses as server-sent events:
+- `meta` — source chunks used as context
+- `assistant_delta` — individual tokens from the LLM
+- `done` — stream complete
+- `error` — something went wrong
 
 ## Roadmap
 

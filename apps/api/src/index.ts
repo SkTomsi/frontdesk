@@ -68,7 +68,7 @@ async function streamAnswer(
 Bun.serve({
 	port: PORT,
 	routes: {
-		"/health": { GET: () => new Response("OK", { status: 200 }) },
+		"/health": { GET: () => new Response("OK OK OK!", { status: 200 }) },
 		"/api/ask": {
 			OPTIONS: () => new Response(null, { headers: CORS_HEADERS }),
 			POST: async (req) => {
