@@ -35,7 +35,7 @@ export function MessageList({ messages }: MessageListProps) {
 				<MessageScrollerViewport className="max-w-3xl mx-auto py-8 px-4">
 					<MessageScrollerContent>
 						{messages.length === 0 && (
-							<MessageScrollerItem>
+							<MessageScrollerItem className="my-auto">
 								<EmptyState />
 							</MessageScrollerItem>
 						)}

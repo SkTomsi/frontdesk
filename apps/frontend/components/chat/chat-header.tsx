@@ -2,7 +2,7 @@ export function ChatHeader() {
 	return (
 		<header className="border-b px-4 py-3 shrink-0">
 			<div className="flex items-center gap-3 max-w-3xl mx-auto">
-				<div className="size-9 rounded-lg bg-primary flex items-center justify-center">
+				<div className="size-10 rounded-lg bg-primary flex items-center justify-center">
 					<svg
 						className="size-5 text-primary-foreground"
 						fill="none"
@@ -18,7 +18,7 @@ export function ChatHeader() {
 					</svg>
 				</div>
 				<div>
-					<h1 className="text-sm font-semibold">Frontdesk</h1>
+					<h1 className="text-lg font-bold">Frontdesk</h1>
 					<p className="text-xs text-muted-foreground">AI-powered support</p>
 				</div>
 			</div>
