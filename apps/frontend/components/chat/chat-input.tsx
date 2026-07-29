@@ -22,12 +22,12 @@ export function ChatInput({
 					onChange={(e) => onChange(e.target.value)}
 					placeholder="Ask a question..."
 					disabled={disabled}
-					className="rounded-xl h-full"
+					className="rounded-xl h-full text-base placeholder:text-sm"
 				/>
 				<Button
 					type="submit"
 					disabled={disabled}
-					className="rounded-xl px-5 h-full"
+					className="rounded-xl px-5 h-full text-sm"
 				>
 					{disabled ? "Streaming..." : "Send"}
 				</Button>

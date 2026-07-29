@@ -1,5 +1,6 @@
 import { BotAvatar, UserAvatar } from "@/components/chat/chat-avatar";
 import { EmptyState } from "@/components/chat/empty-state";
+import { MarkdownContent } from "@/components/chat/markdown-content";
 import { SourceBadges } from "@/components/chat/source-badges";
 import { Bubble, BubbleContent } from "@/components/ui/bubble";
 import {
@@ -59,9 +60,9 @@ export function MessageList({ messages }: MessageListProps) {
 											</Bubble>
 										)}
 										{msg.role === "assistant" && (
-											<pre className="whitespace-pre-wrap text-sm">
-												{msg.content}
-											</pre>
+											<div className="rounded-2xl bg-secondary/50 p-4 text-sm">
+												<MarkdownContent content={msg.content} />
+											</div>
 										)}
 										{msg.sources && msg.sources.length > 0 && (
 											<SourceBadges sources={msg.sources} />
