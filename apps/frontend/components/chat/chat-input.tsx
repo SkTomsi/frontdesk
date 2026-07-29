@@ -15,8 +15,8 @@ export function ChatInput({
 	disabled,
 }: ChatInputProps) {
 	return (
-		<div className="border-t p-4 shrink-0">
-			<form onSubmit={onSubmit} className="flex gap-2 max-w-3xl mx-auto h-12">
+		<div className="p-4 shrink-0">
+			<form onSubmit={onSubmit} className="flex gap-2 max-w-3xl mx-auto h-14">
 				<Input
 					value={value}
 					onChange={(e) => onChange(e.target.value)}
