@@ -1,5 +1,5 @@
 import * as readline from "node:readline";
-
+import { config } from "./config";
 import { sampleDocuments } from "./data/sample-docs";
 import { supportPrompt } from "./prompts";
 import { SupportAnswer } from "./schemas";
@@ -8,9 +8,14 @@ import { Llm } from "./services/llm";
 import { TextSplitter } from "./services/text-splitter";
 import { VectorStore } from "./services/vector-store";
 
-const llm = new Llm();
-const embeddings = new EmbeddingService({ model: "gemini-embedding-2" });
-const splitter = new TextSplitter({ chunkSize: 300, chunkOverlap: 50 });
+const llm = new Llm({
+	model: config.LLM_MODEL,
+});
+const embeddings = new EmbeddingService({ model: config.EMBEDDING_MODEL });
+const splitter = new TextSplitter({
+	chunkSize: config.CHUNK_SIZE,
+	chunkOverlap: config.CHUNK_OVERLAP,
+});
 const vectorStore = new VectorStore();
 
 const structuredModel = llm.withStructuredOutput(SupportAnswer, {
@@ -18,10 +23,11 @@ const structuredModel = llm.withStructuredOutput(SupportAnswer, {
 });
 
 async function ingestDocuments() {
-	await vectorStore.load();
+	await vectorStore.initialize();
 
-	if (vectorStore.count() > 0) {
-		console.log(`Loaded ${vectorStore.count()} documents from cache.`);
+	const count = await vectorStore.count();
+	if (count > 0) {
+		console.log(`Connected to pgvector — ${count} documents already indexed.`);
 		return;
 	}
 
@@ -32,7 +38,7 @@ async function ingestDocuments() {
 	console.log("Generating embeddings...");
 	const vectors = await embeddings.embedDocuments(chunks.map((c) => c.text));
 
-	vectorStore.addDocuments(
+	await vectorStore.addDocuments(
 		chunks.map((chunk, i) => ({
 			id: `doc-${i}`,
 			content: chunk.text,
@@ -41,13 +47,12 @@ async function ingestDocuments() {
 		})),
 	);
 
-	await vectorStore.save();
 	console.log("Done.\n");
 }
 
 async function answerQuestion(question: string) {
 	const queryEmbedding = await embeddings.embedQuery(question);
-	const results = vectorStore.similaritySearch(queryEmbedding, 3);
+	const results = await vectorStore.similaritySearch(queryEmbedding, 3);
 
 	const context = results
 		.map(
@@ -66,6 +71,12 @@ async function main() {
 	const rl = readline.createInterface({
 		input: process.stdin,
 		output: process.stdout,
+	});
+
+	rl.on("close", () => {
+		vectorStore.close();
+		console.log("Goodbye.");
+		process.exit(0);
 	});
 
 	console.log("Frontdesk RAG ready. Ask a question (type 'exit' to quit).\n");
@@ -89,6 +100,7 @@ async function main() {
 				console.log(`  Confidence: ${answer.confidence}`);
 				console.log(`  Sources: ${answer.citedSources.join(", ")}`);
 				console.log(`  Needs review: ${answer.needsHumanReview}\n`);
+				console.log(`  Score: ${answer.score}\n`);
 			} catch (err) {
 				console.error("Error:", err instanceof Error ? err.message : err);
 			}

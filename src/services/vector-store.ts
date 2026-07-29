@@ -1,5 +1,6 @@
-import { existsSync } from "node:fs";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { cosineDistance, desc, sql } from "drizzle-orm";
+import { createDb } from "../db";
+import { documents } from "../db/schema";
 
 export interface StoredDocument {
 	id: string;
@@ -14,68 +15,86 @@ export interface SearchResult {
 }
 
 interface VectorStoreConfig {
-	persistPath?: string;
+	databaseUrl?: string;
 }
 
 export class VectorStore {
-	private documents: StoredDocument[] = [];
-	private persistPath: string;
+	private client: ReturnType<typeof createDb>["client"];
+	private db: ReturnType<typeof createDb>["db"];
 
 	constructor(config: VectorStoreConfig = {}) {
-		this.persistPath = config.persistPath ?? "data/vector-store.json";
+		const { client, db } = createDb(config.databaseUrl);
+		this.client = client;
+		this.db = db;
 	}
 
-	async load() {
-		if (!existsSync(this.persistPath)) return;
-		const data = await readFile(this.persistPath, "utf-8");
-		this.documents = JSON.parse(data);
+	async initialize() {
+		await this.db.execute(sql.raw("CREATE EXTENSION IF NOT EXISTS vector"));
+		await this.db.execute(sql.raw(`CREATE TABLE IF NOT EXISTS "documents" (
+			"id" text PRIMARY KEY,
+			"content" text NOT NULL,
+			"embedding" vector(3072) NOT NULL,
+			"metadata" jsonb DEFAULT '{}' NOT NULL
+		)`));
 	}
 
-	async save() {
-		const dir = this.persistPath.split("/").slice(0, -1).join("/");
-		if (dir) await mkdir(dir, { recursive: true });
-		await writeFile(this.persistPath, JSON.stringify(this.documents, null, 2));
-	}
-
-	addDocuments(docs: StoredDocument[]) {
-		const existingIds = new Set(this.documents.map((d) => d.id));
+	async addDocuments(docs: StoredDocument[]) {
 		for (const doc of docs) {
-			if (existingIds.has(doc.id)) {
-				this.documents = this.documents.filter((d) => d.id !== doc.id);
-			}
-			this.documents.push(doc);
-			existingIds.add(doc.id);
+			await this.db
+				.insert(documents)
+				.values({
+					id: doc.id,
+					content: doc.content,
+					embedding: doc.embedding,
+					metadata: doc.metadata,
+				})
+				.onConflictDoUpdate({
+					target: documents.id,
+					set: {
+						content: doc.content,
+						embedding: doc.embedding,
+						metadata: doc.metadata,
+					},
+				});
 		}
 	}
 
-	similaritySearch(
+	async similaritySearch(
 		queryEmbedding: number[],
 		topK: number = 3,
-	): SearchResult[] {
-		if (this.documents.length === 0) return [];
+	): Promise<SearchResult[]> {
+		const similarity = sql<number>`1 - (${cosineDistance(documents.embedding, queryEmbedding)})`;
 
-		return this.documents
-			.map((doc) => ({
-				document: doc,
-				score: cosineSimilarity(queryEmbedding, doc.embedding),
-			}))
-			.sort((a, b) => b.score - a.score)
-			.slice(0, topK);
+		const rows = await this.db
+			.select({
+				id: documents.id,
+				content: documents.content,
+				metadata: documents.metadata,
+				score: similarity,
+			})
+			.from(documents)
+			.orderBy(desc(similarity))
+			.limit(topK);
+
+		return rows.map((row) => ({
+			document: {
+				id: row.id,
+				content: row.content,
+				embedding: [],
+				metadata: row.metadata as Record<string, unknown>,
+			},
+			score: row.score,
+		}));
 	}
 
-	count(): number {
-		return this.documents.length;
+	async count(): Promise<number> {
+		const [row] = await this.db
+			.select({ count: sql<number>`count(*)::int` })
+			.from(documents);
+		return row?.count ?? 0;
 	}
-}
 
-function cosineSimilarity(a: number[], b: number[]): number {
-	let dot = 0,
-		normA = 0,
-		normB = 0;
-	for (let i = 0; i < a.length; i++) {
-		dot += a[i]! * b[i]!;
-		normA += a[i]! * a[i]!;
-		normB += b[i]! * b[i]!;
+	async close() {
+		await this.client.close();
 	}
-	return dot / (Math.sqrt(normA) * Math.sqrt(normB));
 }

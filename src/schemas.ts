@@ -7,5 +7,6 @@ export const SupportAnswer = z.object({
 		.array(z.string())
 		.describe("Doc titles or IDs the answer relied on."),
 	needsHumanReview: z.boolean(),
+	score: z.number().describe("Confidence score from 0.0 to 1.0."),
 });
 export type SupportAnswer = z.infer<typeof SupportAnswer>;
