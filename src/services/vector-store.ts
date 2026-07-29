@@ -1,4 +1,4 @@
-import { cosineDistance, desc, sql } from "drizzle-orm";
+import { desc, sql } from "drizzle-orm";
 import { createDb } from "../db";
 import { documents } from "../db/schema";
 
@@ -63,7 +63,7 @@ export class VectorStore {
 		queryEmbedding: number[],
 		topK: number = 3,
 	): Promise<SearchResult[]> {
-		const similarity = sql<number>`1 - (${cosineDistance(documents.embedding, queryEmbedding)})`;
+		const similarity = sql<number>`1 - (${documents.embedding} <=> ${JSON.stringify(queryEmbedding)}::vector)`;
 
 		const rows = await this.db
 			.select({

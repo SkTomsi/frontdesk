@@ -7,6 +7,7 @@ import { EmbeddingService } from "./services/embeddings";
 import { Llm } from "./services/llm";
 import { TextSplitter } from "./services/text-splitter";
 import { VectorStore } from "./services/vector-store";
+import type { SearchResult } from "./services/vector-store";
 
 const llm = new Llm({
 	model: config.LLM_MODEL,
@@ -55,14 +56,25 @@ async function answerQuestion(question: string) {
 	const results = await vectorStore.similaritySearch(queryEmbedding, 3);
 
 	const context = results
-		.map(
-			(r, i) =>
-				`[Source ${i + 1}] (score: ${r.score.toFixed(3)})\n${r.document.content}`,
-		)
+		.map((r) => {
+			const label =
+				(r.document.metadata.title as string) || r.document.id;
+			return `[${label}] (score: ${r.score.toFixed(3)})\n${r.document.content}`;
+		})
 		.join("\n\n");
 
 	const prompt = supportPrompt({ context, question });
-	return structuredModel.invoke(prompt);
+	const answer = await structuredModel.invoke(prompt);
+	return { answer, results };
+}
+
+async function printSources(results: SearchResult[]) {
+	console.log("  Sources:");
+	for (const r of results) {
+		const label =
+			(r.document.metadata.title as string) || r.document.id;
+		console.log(`    ${label} — similarity: ${r.score.toFixed(3)}`);
+	}
 }
 
 async function main() {
@@ -95,12 +107,12 @@ async function main() {
 			}
 
 			try {
-				const answer = await answerQuestion(question);
-				console.log(`\nAgent: ${answer.answer}`);
+				const { answer, results } = await answerQuestion(question);
+				console.log(`  Agent: ${answer.answer}`);
 				console.log(`  Confidence: ${answer.confidence}`);
-				console.log(`  Sources: ${answer.citedSources.join(", ")}`);
-				console.log(`  Needs review: ${answer.needsHumanReview}\n`);
-				console.log(`  Score: ${answer.score}\n`);
+				console.log(`  Needs review: ${answer.needsHumanReview}`);
+				printSources(results);
+				console.log();
 			} catch (err) {
 				console.error("Error:", err instanceof Error ? err.message : err);
 			}
