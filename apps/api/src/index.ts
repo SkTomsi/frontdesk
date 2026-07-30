@@ -24,12 +24,17 @@ await vectorStore.initialize();
 const count = await vectorStore.count();
 if (count === 0) {
 	const chunks = await splitter.splitDocuments(sampleDocuments);
-	const vectors = await embeddings.embedDocuments(chunks.map((c) => c.text));
+	const texts = chunks.map((c) => c.text);
+	const vectors = await embeddings.embedDocuments(texts);
 	await vectorStore.addDocuments(
 		chunks.map((chunk, i) => ({
-			id: `doc-${i}`,
+			id: crypto.randomUUID(),
+			documentId: "sample-doc",
+			tenantId: "default",
 			content: chunk.text,
+			chunkIndex: i,
 			embedding: vectors[i]!,
+			embeddingModel: embeddings.modelName,
 			metadata: chunk.metadata,
 		})),
 	);
