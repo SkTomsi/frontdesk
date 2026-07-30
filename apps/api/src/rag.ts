@@ -12,7 +12,7 @@ interface RetrievalResult {
 }
 
 function normalizeScore(raw: number): number {
-	return Math.pow(raw, 0.45);
+	return raw ** 0.45;
 }
 
 export async function retrieveContext(

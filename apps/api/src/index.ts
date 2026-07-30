@@ -22,10 +22,14 @@ const vectorStore = new VectorStore();
 
 await vectorStore.initialize();
 const count = await vectorStore.count();
+console.log(`Vector store contains ${count} chunks`);
 if (count === 0) {
+	console.log("Splitting documents...");
 	const chunks = await splitter.splitDocuments(sampleDocuments);
 	const texts = chunks.map((c) => c.text);
+	console.log("Embedding texts...");
 	const vectors = await embeddings.embedDocuments(texts);
+	console.log("Adding chunks to vector store...");
 	await vectorStore.addDocuments(
 		chunks.map((chunk, i) => ({
 			id: crypto.randomUUID(),

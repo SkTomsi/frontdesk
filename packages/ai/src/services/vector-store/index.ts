@@ -1,6 +1,6 @@
-import { desc, sql } from "drizzle-orm";
 import { createDb } from "@frontdesk/db";
 import { documentChunks } from "@frontdesk/db/schema";
+import { desc, sql } from "drizzle-orm";
 
 export interface StoredDocument {
 	id: string;
@@ -34,26 +34,32 @@ export class VectorStore {
 
 	async initialize() {
 		await this.db.execute(sql.raw("CREATE EXTENSION IF NOT EXISTS vector"));
-		await this.db.execute(sql.raw(`CREATE TABLE IF NOT EXISTS "document_chunks" (
+		await this.db.execute(
+			sql.raw(`CREATE TABLE IF NOT EXISTS "document_chunks" (
 			"id" text PRIMARY KEY,
 			"document_id" text NOT NULL,
 			"tenant_id" text NOT NULL,
 			"content" text NOT NULL,
 			"chunk_index" integer NOT NULL,
-			"embedding" vector(3072) NOT NULL,
+			"embedding" vector(1536) NOT NULL,
 			"embedding_model" text NOT NULL,
 			"metadata" jsonb DEFAULT '{}' NOT NULL
-		)`));
+		)`),
+		);
 		await this.db.execute(
 			sql.raw(
 				`CREATE INDEX IF NOT EXISTS "chunks_embedding_hnsw_idx" ON "document_chunks" USING hnsw ("embedding" vector_cosine_ops)`,
 			),
 		);
 		await this.db.execute(
-			sql.raw(`CREATE INDEX IF NOT EXISTS "chunks_tenant_idx" ON "document_chunks" ("tenant_id")`),
+			sql.raw(
+				`CREATE INDEX IF NOT EXISTS "chunks_tenant_idx" ON "document_chunks" ("tenant_id")`,
+			),
 		);
 		await this.db.execute(
-			sql.raw(`CREATE INDEX IF NOT EXISTS "chunks_document_idx" ON "document_chunks" ("document_id")`),
+			sql.raw(
+				`CREATE INDEX IF NOT EXISTS "chunks_document_idx" ON "document_chunks" ("document_id")`,
+			),
 		);
 	}
 

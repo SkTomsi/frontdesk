@@ -24,7 +24,7 @@ export class EmbeddingService {
 		}
 
 		this.modelName = config.model ?? "gemini-embedding-001";
-		this.batchSize = config.batchSize ?? 100;
+		this.batchSize = config.batchSize ?? 5;
 		this.concurrency = config.concurrency ?? 3;
 		this.maxRetries = config.maxRetries ?? 3;
 		this.timeoutMs = config.timeoutMs ?? 30_000;

@@ -1,35 +1,41 @@
-import { TaskType } from "@google/generative-ai";
-import { GoogleGenerativeAIEmbeddings } from "@langchain/google-genai";
+import { GoogleGenAI } from "@google/genai";
 
 import type { EmbeddingProvider } from "./types";
 
 export class GoogleEmbeddingProvider implements EmbeddingProvider {
-	private queryClient: GoogleGenerativeAIEmbeddings;
-	private documentClient: GoogleGenerativeAIEmbeddings;
+	private client: GoogleGenAI;
 
 	public readonly modelName: string;
 
-	constructor(config: { apiKey: string; model: string }) {
+	private dimensions: number;
+
+	constructor(config: { apiKey: string; model: string; dimensions?: number }) {
+		this.client = new GoogleGenAI({ apiKey: config.apiKey });
 		this.modelName = config.model;
-
-		this.queryClient = new GoogleGenerativeAIEmbeddings({
-			apiKey: config.apiKey,
-			modelName: config.model,
-			taskType: TaskType.RETRIEVAL_QUERY,
-		});
-
-		this.documentClient = new GoogleGenerativeAIEmbeddings({
-			apiKey: config.apiKey,
-			modelName: config.model,
-			taskType: TaskType.RETRIEVAL_DOCUMENT,
-		});
+		this.dimensions = config.dimensions ?? 1536;
 	}
 
 	async embedDocuments(texts: string[]): Promise<number[][]> {
-		return this.documentClient.embedDocuments(texts);
+		const res = await this.client.models.embedContent({
+			model: this.modelName,
+			contents: texts,
+			config: {
+				taskType: "RETRIEVAL_DOCUMENT",
+				outputDimensionality: this.dimensions,
+			},
+		});
+		return (res.embeddings ?? []).map((e) => e.values ?? []);
 	}
 
 	async embedQuery(text: string): Promise<number[]> {
-		return this.queryClient.embedQuery(text);
+		const res = await this.client.models.embedContent({
+			model: this.modelName,
+			contents: text,
+			config: {
+				taskType: "RETRIEVAL_QUERY",
+				outputDimensionality: this.dimensions,
+			},
+		});
+		return res.embeddings?.[0]?.values ?? [];
 	}
 }

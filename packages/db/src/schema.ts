@@ -15,7 +15,7 @@ export const documentChunks = pgTable(
 		tenantId: text("tenant_id").notNull(),
 		content: text("content").notNull(),
 		chunkIndex: integer("chunk_index").notNull(),
-		embedding: vector("embedding", { dimensions: 3072 }).notNull(),
+		embedding: vector("embedding", { dimensions: 1536 }).notNull(),
 		embeddingModel: text("embedding_model").notNull(),
 		metadata: jsonb("metadata").default({}).notNull(),
 	},
