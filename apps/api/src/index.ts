@@ -7,6 +7,9 @@ import {
 	TextSplitter,
 	VectorStore,
 } from "@frontdesk/ai";
+import { ChunkRepository, DocumentRepository } from "@frontdesk/db";
+import { createIngestQueue } from "@frontdesk/queue";
+import { createR2FromEnv, objectKey } from "@frontdesk/storage";
 import { retrieveContext } from "./rag";
 import { CORS_HEADERS, STREAM_HEADERS, send } from "./sse";
 
@@ -19,6 +22,10 @@ const splitter = new TextSplitter({
 	chunkOverlap: config.CHUNK_OVERLAP,
 });
 const vectorStore = new VectorStore();
+const chunkRepository = new ChunkRepository();
+const documentRepository = new DocumentRepository();
+const r2 = createR2FromEnv();
+const ingestQueue = createIngestQueue();
 
 await vectorStore.initialize();
 const count = await vectorStore.count();
@@ -44,6 +51,10 @@ if (count === 0) {
 	);
 }
 
+function tenantFrom(req: Request): string {
+	return req.headers.get("x-tenant-id") ?? "default";
+}
+
 async function streamAnswer(
 	question: string,
 	controller: ReadableStreamDefaultController,
@@ -52,6 +63,7 @@ async function streamAnswer(
 		question,
 		embeddings,
 		vectorStore,
+		chunkRepository,
 	);
 
 	const llmStream = await llm.stream(supportPrompt({ context, question }));
@@ -110,6 +122,108 @@ Bun.serve({
 				});
 
 				return new Response(body, { headers: STREAM_HEADERS });
+			},
+		},
+		"/api/ingest": {
+			POST: async (req) => {
+				const tenantId = tenantFrom(req);
+				try {
+					const formData = await req.formData();
+					const file = formData.get("file");
+					if (!(file instanceof File)) {
+						return Response.json(
+							{ error: "No 'file' part provided" },
+							{ status: 400 },
+						);
+					}
+
+					const isPdf =
+						file.type === "application/pdf" ||
+						file.name.toLowerCase().endsWith(".pdf");
+					if (!isPdf) {
+						return Response.json(
+							{ error: "Only PDF files are supported" },
+							{ status: 400 },
+						);
+					}
+
+					const bytes = new Uint8Array(await file.arrayBuffer());
+					const contentHash = new Bun.CryptoHasher("sha256")
+						.update(bytes)
+						.digest("hex");
+
+					const existing = await documentRepository.findActiveByHash(
+						tenantId,
+						contentHash,
+					);
+					if (existing) {
+						return Response.json(
+							{
+								error: "This document has already been ingested",
+								documentId: existing.id,
+							},
+							{ status: 409 },
+						);
+					}
+
+					const documentId = crypto.randomUUID();
+					const key = objectKey(tenantId, contentHash);
+
+					await r2.uploadObject(key, bytes, "application/pdf");
+
+					await documentRepository.create({
+						id: documentId,
+						tenantId,
+						filename: file.name,
+						contentType: file.type,
+						sizeBytes: bytes.length,
+						contentHash,
+						objectKey: key,
+					});
+
+					try {
+						await ingestQueue.enqueue({ documentId, tenantId, objectKey: key });
+					} catch (error) {
+						await documentRepository.setStatus(documentId, {
+							status: "failed",
+							error: error instanceof Error ? error.message : String(error),
+						});
+						throw error;
+					}
+
+					return Response.json(
+						{
+							documentId,
+							status: "queued",
+							tenantId,
+						},
+						{ status: 202 },
+					);
+				} catch (error) {
+					console.error({ event: "ingest_request_failed", error });
+					return Response.json(
+						{ error: "Failed to ingest document" },
+						{ status: 500 },
+					);
+				}
+			},
+		},
+		"/api/ingest/status/:id": {
+			GET: async (req) => {
+				const tenantId = tenantFrom(req);
+				const document = await documentRepository.getById(req.params.id);
+				if (!document || document.tenantId !== tenantId) {
+					return Response.json({ error: "Not found" }, { status: 404 });
+				}
+				return Response.json({
+					documentId: document.id,
+					filename: document.filename,
+					status: document.status,
+					chunkCount: document.chunkCount,
+					error: document.error,
+					createdAt: document.createdAt,
+					completedAt: document.completedAt,
+				});
 			},
 		},
 	},

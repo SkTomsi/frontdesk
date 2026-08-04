@@ -1,5 +1,5 @@
 {
-  "name": "@frontdesk/api",
+  "name": "@frontdesk/worker",
   "type": "module",
   "private": true,
   "scripts": {
@@ -9,6 +9,7 @@
   "dependencies": {
     "@frontdesk/ai": "workspace:*",
     "@frontdesk/db": "workspace:*",
+    "@frontdesk/ingest": "workspace:*",
     "@frontdesk/queue": "workspace:*",
     "@frontdesk/storage": "workspace:*"
   },

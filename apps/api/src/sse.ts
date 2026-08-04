@@ -11,7 +11,7 @@ export function send(controller: ReadableStreamDefaultController, event: StreamE
 export const CORS_HEADERS = {
 	"Access-Control-Allow-Origin": "*",
 	"Access-Control-Allow-Methods": "POST, OPTIONS",
-	"Access-Control-Allow-Headers": "Content-Type",
+	"Access-Control-Allow-Headers": "Content-Type, X-Tenant-ID",
 };
 
 export const STREAM_HEADERS = {

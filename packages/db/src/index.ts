@@ -17,3 +17,17 @@ export function createDb(databaseUrl?: string): DbConnection {
 	globalStore.__frontdeskDb = { client, db: drizzle({ client }) };
 	return globalStore.__frontdeskDb;
 }
+
+export { ChunkRepository } from "./repositories/chunks";
+export type {
+	NewChunk,
+	SearchResultRow,
+	StoredChunk,
+} from "./repositories/chunks";
+export { DocumentRepository } from "./repositories/documents";
+export type {
+	DocumentRecord,
+	DocumentStatus,
+	DocumentStatusUpdate,
+	NewDocument,
+} from "./repositories/documents";
