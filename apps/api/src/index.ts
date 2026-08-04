@@ -1,15 +1,14 @@
 import {
+	buildAgentGraph,
 	config,
 	EmbeddingService,
 	Llm,
-	supportPrompt,
 	VectorStore,
 } from "@frontdesk/ai";
 import { ChunkRepository, DocumentRepository } from "@frontdesk/db";
 import { createLogger } from "@frontdesk/logger";
 import { createIngestQueue } from "@frontdesk/queue";
 import { createR2FromEnv, objectKey } from "@frontdesk/storage";
-import { retrieveContext } from "./rag";
 import { CORS_HEADERS, STREAM_HEADERS, send } from "./sse";
 
 const PORT = 3003;
@@ -22,6 +21,13 @@ const chunkRepository = new ChunkRepository();
 const documentRepository = new DocumentRepository();
 const r2 = createR2FromEnv();
 const ingestQueue = createIngestQueue();
+const agentGraph = buildAgentGraph({
+	llm,
+	embeddings,
+	vectorStore,
+	chunkRepository,
+	logger: log.child({ context: "agent" }),
+});
 
 await vectorStore.initialize();
 log.info({ event: "startup", port: PORT }, "vector store initialized");
@@ -96,39 +102,41 @@ async function streamAnswer(
 	const started = performance.now();
 	log.info({ event: "ask_received", tenantId, question }, "question received");
 
-	const { results, context } = await retrieveContext(
-		question,
-		embeddings,
-		vectorStore,
-		chunkRepository,
-		tenantId,
+	const sendToken = (text: string) => {
+		send(controller, { type: "assistant_delta", text });
+	};
+
+	const result = await agentGraph.invoke(
+		{ query: question, tenantId },
+		{ configurable: { onToken: sendToken } },
 	);
+
+	const answer = result.finalAnswer;
+	const retrieved = result.retrievedChunks ?? [];
+	const parentChunks = result.parentChunks ?? [];
+	const contextLength = parentChunks.reduce(
+		(total, chunk) => total + chunk.content.length,
+		0,
+	);
+
 	log.info(
 		{
-			event: "retrieval_completed",
+			event: "agent_graph_completed",
 			tenantId,
 			question,
-			resultCount: results.length,
-			contextLength: context.length,
+			resultCount: retrieved.length,
+			contextChunks: parentChunks.length,
+			contextLength,
+			iterations: result.iteration,
+			contextScore: result.contextScore,
 			durationMs: Math.round(performance.now() - started),
 		},
-		`retrieved ${results.length} result(s)`,
+		"agent graph completed",
 	);
 
-	const llmStream = await llm.stream(supportPrompt({ context, question }));
-
-	let answer = "";
-	for await (const chunk of llmStream) {
-		const text = chunk.content as string;
-		if (text) {
-			answer += text;
-			send(controller, { type: "assistant_delta", text });
-		}
-	}
-
-	const citedSources = results.filter((r) => {
+	const citedSources = retrieved.filter((r) => {
 		const title = r.document.metadata.title as string;
-		return answer.includes(title);
+		return title && answer.includes(title);
 	});
 
 	let totalChars = 0;

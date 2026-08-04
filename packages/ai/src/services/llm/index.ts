@@ -1,5 +1,7 @@
 import type { BaseMessage } from "@langchain/core/messages";
+import type { Runnable } from "@langchain/core/runnables";
 import { ChatGroq } from "@langchain/groq";
+import type { z } from "zod";
 
 interface LlmConfig {
 	apiKey?: string;
@@ -25,5 +27,9 @@ export class Llm {
 	async stream(input: string | BaseMessage[]) {
 		const stream = await this.client.stream(input);
 		return stream;
+	}
+
+	structured<T extends z.ZodTypeAny>(schema: T): Runnable {
+		return this.client.withStructuredOutput(schema, { method: "jsonMode" });
 	}
 }

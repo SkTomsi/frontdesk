@@ -2,6 +2,10 @@
 
 A self-hostable SaaS where users ingest their company docs and deploy intelligent support agents across chat platforms.
 
+> **Status:** Phase 01 (RAG Foundation) shipped · Phase 02 (Agent Graph) in progress
+> **Architecture reference:** [`docs/build-guide.html`](build-guide.html) — the 8-node agent graph spec
+> **Stack:** Bun workspace (`apps/{api,worker,frontend}`, `packages/{ai,db,ingest,queue,storage,logger}`) · pgvector (TimescaleDB pg16) · Cloudflare R2 · BullMQ/Redis · Groq (`openai/gpt-oss-120b`) + Google Gemini embeddings
+
 ---
 
 ## Phase 01 — RAG Foundation *(current)*
@@ -13,7 +17,7 @@ A self-hostable, **distributed** RAG pipeline. PDFs are uploaded through a web U
 - [x] Hierarchical chunking (embedded children matched; parents used as answer context)
 - [x] Embedding generation with Google Gemini (`gemini-embedding-001`, 1536-dim)
 - [x] PostgreSQL-backed vector store with pgvector via Drizzle ORM
-- [x] Structured LLM output with Zod schemas
+- [x] Structured LLM output with Zod schemas — `SupportAnswer` defined in `packages/ai/src/schemas.ts`, pending wiring into generation
 - [x] Prompt templates separated from logic
 - [x] Retry with exponential backoff on embedding API
 - [x] Docker Compose for database (TimescaleDB with pgvector)
@@ -34,18 +38,24 @@ A self-hostable, **distributed** RAG pipeline. PDFs are uploaded through a web U
 
 ---
 
-## Phase 02 — Agent Graph
+## Phase 02 — Agent Graph *(current)*
 
-Move from single-shot retrieval to a multi-step reasoning agent. Using LangGraph, the agent can plan its approach, retrieve context, reflect on the answer quality, and self-correct if needed. This enables handling complex questions that require synthesizing information from multiple documents or reasoning through multi-hop queries.
+Move from single-shot retrieval to a multi-step reasoning agent. Per the architecture in [`docs/build-guide.html`](build-guide.html) (§09), the query path runs through a **LangGraph** state machine: `classify → (decompose) → retrieve → parentFetch → assess → reformulate-loop → generate → (faithfulness)`. The agent plans its approach, retrieves context, reflects on whether the context is sufficient, and self-corrects by reformulating before answering. Implemented in `packages/ai/src/graph/` (state, prompts, nodes, graph).
 
 **Todo:**
-- [ ] Define agent state schema (messages, context, reasoning steps)
-- [ ] Build LangGraph graph with retrieve → reason → reflect → answer nodes
-- [ ] Add reflection loop — agent evaluates its own answer before responding
-- [ ] Implement fallback to human escalation on low confidence
-- [ ] Add conversation memory for multi-turn support
-- [ ] Streaming responses for real-time UX
-- [ ] Token usage tracking per conversation turn
+- [x] Streaming responses for real-time UX — SSE (`assistant_delta` / `meta` / `done`), now re-plumbed through the graph via a config-passed `onToken` callback (S2.1)
+- [x] Define agent state schema — LangGraph `AgentState` (query, tenantId, queryType, iteration, retrievedChunks, parentChunks, contextScore/reason, finalAnswer, messages) (S2.1)
+- [x] Build LangGraph graph — linear `classify → retrieve → parentFetch → generate` skeleton replacing the inline `streamAnswer` path (S2.1)
+- [x] Add reflection loop — `assess` node (contextScore 0–10) routing `≥ 7 → generate`, else `reformulate → retrieve` up to 3 iterations; replaces the hard 0.7 similarity gate (S2.2)
+- [ ] Multi-part decomposition — `decompose` node retrieves per sub-question (S2.3; node is a pass-through stub)
+- [ ] Conversation memory for multi-turn support — `messages` reducer in state, history into the generate prompt (S2.4)
+- [ ] Fallback to human escalation on low confidence — `needsHumanReview` flag after max iterations (S2.5)
+- [ ] Token usage tracking per conversation turn (S2.6)
+- [ ] Hybrid retrieval (dense + sparse/BM25, RRF fusion) — needs `pg_search`/ParadeDB or Qdrant
+- [ ] Local reranker — BGE-Reranker-v2-M3 via `@huggingface/transformers` (ONNX) (build-guide §11)
+- [ ] Redis semantic cache — embed query, cosine ≥ 0.88, TTL 24h (build-guide §10)
+- [ ] Faithfulness check node + eval dataset + Langfuse tracing — see Phase 07 / build-guide Phase 2 (§12–13)
+- [ ] Document versioning — soft-delete on re-ingest, version history table
 
 **Concepts:** LangGraph, state machines, ReAct pattern, reflection, multi-hop reasoning, conversation memory, streaming
 
