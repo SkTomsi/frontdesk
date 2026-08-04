@@ -1,3 +1,5 @@
+![Frontdesk](icon.png)
+
 # Frontdesk
 
 A self-hostable, distributed RAG system. Users upload PDFs through a web UI; an async worker pipeline parses, hierarchically chunks, and embeds them into a pgvector-backed store; a chat UI answers questions with cited sources. Built with Bun, BullMQ + Redis, Cloudflare R2, LangChain, pgvector, and Drizzle ORM.
