@@ -9,6 +9,7 @@
   "dependencies": {
     "@frontdesk/ai": "workspace:*",
     "@frontdesk/db": "workspace:*",
+    "@frontdesk/logger": "workspace:*",
     "@frontdesk/queue": "workspace:*",
     "@frontdesk/storage": "workspace:*"
   },

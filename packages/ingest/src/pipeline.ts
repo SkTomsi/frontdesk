@@ -3,6 +3,7 @@ import type {
 	ChunkRepository,
 	DocumentRepository,
 } from "@frontdesk/db/repositories";
+import { createLogger, type Logger } from "@frontdesk/logger";
 import { HierarchicalChunker } from "./chunker";
 import { parsePdf } from "./parser";
 
@@ -24,29 +25,67 @@ export interface IngestPipelineDeps {
 	chunkRepository: ChunkRepository;
 	documentRepository: DocumentRepository;
 	embeddingService: EmbeddingService;
+	logger?: Logger;
 }
 
 export class IngestPipeline {
-	constructor(private deps: IngestPipelineDeps) {}
+	private log: Logger;
+
+	constructor(private deps: IngestPipelineDeps) {
+		this.log = deps.logger ?? createLogger("ingest");
+	}
 
 	async run(input: IngestInput): Promise<IngestOutput> {
 		const { chunkRepository, documentRepository, embeddingService } = this.deps;
 		const { tenantId, documentId, pdf } = input;
+		const log = this.log.child({ tenantId, documentId });
 
+		const started = performance.now();
 		await chunkRepository.initialize();
 		await documentRepository.setStatus(documentId, { status: "processing" });
+		log.info({ event: "status", status: "processing" }, "marking document as processing");
 
 		try {
+			const parseStarted = performance.now();
 			const parsed = await parsePdf(pdf);
 			if (!parsed.fullText.trim()) {
 				throw new Error("PDF contains no extractable text");
 			}
+			log.info(
+				{
+					event: "pdf_parsed",
+					pages: parsed.pages.length,
+					characters: parsed.fullText.length,
+					durationMs: Math.round(performance.now() - parseStarted),
+				},
+				"parsed PDF",
+			);
 
+			const chunkStarted = performance.now();
 			const chunker = new HierarchicalChunker();
 			const { parents, children } = await chunker.split(parsed);
+			log.info(
+				{
+					event: "chunked",
+					parents: parents.length,
+					children: children.length,
+					durationMs: Math.round(performance.now() - chunkStarted),
+				},
+				"hierarchical chunking complete",
+			);
 
+			const embedStarted = performance.now();
 			const embeddings = await embeddingService.embedDocuments(
 				children.map((child) => child.content),
+			);
+			log.info(
+				{
+					event: "embedding_completed",
+					count: embeddings.length,
+					model: embeddingService.modelName,
+					durationMs: Math.round(performance.now() - embedStarted),
+				},
+				"embedded child chunks",
 			);
 
 			const parentRows = parents.map((parent) => ({
@@ -77,7 +116,16 @@ export class IngestPipeline {
 				metadata: child.metadata,
 			}));
 
+			const writeStarted = performance.now();
 			await chunkRepository.insertMany([...parentRows, ...childRows]);
+			log.info(
+				{
+					event: "chunks_upserted",
+					rows: parentRows.length + childRows.length,
+					durationMs: Math.round(performance.now() - writeStarted),
+				},
+				"upserted chunks",
+			);
 
 			await documentRepository.setStatus(documentId, {
 				status: "completed",
@@ -85,18 +133,38 @@ export class IngestPipeline {
 				completedAt: new Date(),
 			});
 
-			return {
+			const output = {
 				documentId,
 				tenantId,
 				parentCount: parents.length,
 				childCount: children.length,
 				embeddingModel: embeddingService.modelName,
 			};
+
+			log.info(
+				{
+					event: "ingest_completed",
+					parentCount: output.parentCount,
+					childCount: output.childCount,
+					durationMs: Math.round(performance.now() - started),
+				},
+				"ingest completed",
+			);
+
+			return output;
 		} catch (error) {
 			await documentRepository.setStatus(documentId, {
 				status: "failed",
 				error: error instanceof Error ? error.message : String(error),
 			});
+			log.error(
+				{
+					event: "ingest_failed",
+					durationMs: Math.round(performance.now() - started),
+					error,
+				},
+				"ingest failed",
+			);
 			throw error;
 		}
 	}

@@ -1,5 +1,8 @@
+import { createLogger } from "@frontdesk/logger";
 import { GoogleEmbeddingProvider } from "./google-embedding-provider";
 import type { EmbeddingProvider, EmbeddingServiceConfig } from "./types";
+
+const log = createLogger("ai");
 
 export class EmbeddingService {
 	private provider: EmbeddingProvider;
@@ -80,12 +83,15 @@ export class EmbeddingService {
 
 		const duration = performance.now() - start;
 
-		console.info({
-			event: "embedding_batch_completed",
-			model: this.modelName,
-			batchSize: texts.length,
-			durationMs: Math.round(duration),
-		});
+		log.info(
+			{
+				event: "embedding_batch_completed",
+				model: this.modelName,
+				batchSize: texts.length,
+				durationMs: Math.round(duration),
+			},
+			"embedded batch",
+		);
 
 		return embeddings;
 	}
@@ -103,13 +109,16 @@ export class EmbeddingService {
 
 				const delay = this.calculateBackoff(attempt);
 
-				console.warn({
-					event: "embedding_retry",
-					attempt: attempt + 1,
-					maxRetries: this.maxRetries,
-					delayMs: delay,
-					error,
-				});
+				log.warn(
+					{
+						event: "embedding_retry",
+						attempt: attempt + 1,
+						maxRetries: this.maxRetries,
+						delayMs: delay,
+						error,
+					},
+					"retrying embedding request",
+				);
 
 				await this.sleep(delay);
 			}

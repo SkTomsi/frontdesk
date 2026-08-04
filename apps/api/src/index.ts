@@ -6,12 +6,14 @@ import {
 	VectorStore,
 } from "@frontdesk/ai";
 import { ChunkRepository, DocumentRepository } from "@frontdesk/db";
+import { createLogger } from "@frontdesk/logger";
 import { createIngestQueue } from "@frontdesk/queue";
 import { createR2FromEnv, objectKey } from "@frontdesk/storage";
 import { retrieveContext } from "./rag";
 import { CORS_HEADERS, STREAM_HEADERS, send } from "./sse";
 
 const PORT = 3003;
+const log = createLogger("api");
 
 const llm = new Llm({ model: config.LLM_MODEL });
 const embeddings = new EmbeddingService({ model: config.EMBEDDING_MODEL });
@@ -22,6 +24,7 @@ const r2 = createR2FromEnv();
 const ingestQueue = createIngestQueue();
 
 await vectorStore.initialize();
+log.info({ event: "startup", port: PORT }, "vector store initialized");
 
 function tenantFrom(req: Request): string {
 	return req.headers.get("x-tenant-id") ?? "default";
@@ -32,6 +35,44 @@ function json(body: unknown, status: number): Response {
 		status,
 		headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
 	});
+}
+
+async function handle(
+	label: string,
+	req: Request,
+	fn: () => Promise<Response>,
+): Promise<Response> {
+	const started = performance.now();
+	try {
+		const res = await fn();
+		log.info(
+			{
+				event: "request",
+				label,
+				method: req.method,
+				path: new URL(req.url).pathname,
+				tenant: tenantFrom(req),
+				status: res.status,
+				durationMs: Math.round(performance.now() - started),
+			},
+			`${label} -> ${res.status}`,
+		);
+		return res;
+	} catch (error) {
+		log.error(
+			{
+				event: "request_error",
+				label,
+				method: req.method,
+				path: new URL(req.url).pathname,
+				tenant: tenantFrom(req),
+				durationMs: Math.round(performance.now() - started),
+				error,
+			},
+			`${label} failed`,
+		);
+		return json({ error: "Internal server error" }, 500);
+	}
 }
 
 function documentPayload(doc: Awaited<ReturnType<DocumentRepository["getById"]>>) {
@@ -52,12 +93,26 @@ async function streamAnswer(
 	tenantId: string,
 	controller: ReadableStreamDefaultController,
 ) {
+	const started = performance.now();
+	log.info({ event: "ask_received", tenantId, question }, "question received");
+
 	const { results, context } = await retrieveContext(
 		question,
 		embeddings,
 		vectorStore,
 		chunkRepository,
 		tenantId,
+	);
+	log.info(
+		{
+			event: "retrieval_completed",
+			tenantId,
+			question,
+			resultCount: results.length,
+			contextLength: context.length,
+			durationMs: Math.round(performance.now() - started),
+		},
+		`retrieved ${results.length} result(s)`,
 	);
 
 	const llmStream = await llm.stream(supportPrompt({ context, question }));
@@ -89,6 +144,16 @@ async function streamAnswer(
 	}
 
 	send(controller, { type: "done" });
+	log.info(
+		{
+			event: "ask_stream_completed",
+			tenantId,
+			answerLength: answer.length,
+			citedSources: citedSources.length,
+			durationMs: Math.round(performance.now() - started),
+		},
+		"answer streamed",
+	);
 }
 
 Bun.serve({
@@ -97,161 +162,254 @@ Bun.serve({
 		"/health": { GET: () => new Response("OK OK OK!", { status: 200 }) },
 		"/api/ask": {
 			OPTIONS: () => new Response(null, { headers: CORS_HEADERS }),
-			POST: async (req) => {
-				const tenantId = tenantFrom(req);
-				const { question } = (await req.json()) as { question: string };
+			POST: (req) =>
+				handle("ask", req, async () => {
+					const tenantId = tenantFrom(req);
+					const { question } = (await req.json()) as { question: string };
 
-				const body = new ReadableStream({
-					async start(controller) {
-						try {
-							await streamAnswer(question, tenantId, controller);
-						} catch {
-							send(controller, {
-								type: "error",
-								message: "Something went wrong",
-							});
-						} finally {
-							controller.close();
-						}
-					},
-				});
+					const body = new ReadableStream({
+						async start(controller) {
+							try {
+								await streamAnswer(question, tenantId, controller);
+							} catch (error) {
+								log.error(
+									{
+										event: "ask_stream_error",
+										tenantId,
+										error,
+									},
+									"answer stream failed",
+								);
+								send(controller, {
+									type: "error",
+									message: "Something went wrong",
+								});
+							} finally {
+								controller.close();
+							}
+						},
+					});
 
-				return new Response(body, { headers: STREAM_HEADERS });
-			},
+					return new Response(body, { headers: STREAM_HEADERS });
+				}),
 		},
 		"/api/ingest": {
 			OPTIONS: () => new Response(null, { headers: CORS_HEADERS }),
-			GET: async (req) => {
-				const tenantId = tenantFrom(req);
-				const url = new URL(req.url);
-				const status = url.searchParams.get("status");
-				const docs = await documentRepository.listByTenant(tenantId, {
-					status: (status as "queued" | "processing" | "completed" | "failed") ?? undefined,
-				});
-				return json({ documents: docs.map((d) => documentPayload(d)) }, 200);
-			},
-			POST: async (req) => {
-				const tenantId = tenantFrom(req);
-				try {
-					const formData = await req.formData();
-					const file = formData.get("file");
-					if (!(file instanceof File)) {
-						return json({ error: "No 'file' part provided" }, 400);
-					}
-
-					const isPdf =
-						file.type === "application/pdf" ||
-						file.name.toLowerCase().endsWith(".pdf");
-					if (!isPdf) {
-						return json({ error: "Only PDF files are supported" }, 400);
-					}
-
-					const bytes = new Uint8Array(await file.arrayBuffer());
-					const contentHash = new Bun.CryptoHasher("sha256")
-						.update(bytes)
-						.digest("hex");
-
-					const existing = await documentRepository.findActiveByHash(
-						tenantId,
-						contentHash,
+			GET: (req) =>
+				handle("list_documents", req, async () => {
+					const tenantId = tenantFrom(req);
+					const url = new URL(req.url);
+					const status = url.searchParams.get("status");
+					const docs = await documentRepository.listByTenant(tenantId, {
+						status: (status as "queued" | "processing" | "completed" | "failed") ?? undefined,
+					});
+					log.info(
+						{ event: "documents_listed", tenantId, count: docs.length, status },
+						`listed ${docs.length} document(s)`,
 					);
-					if (existing && existing.status !== "failed") {
+					return json({ documents: docs.map((d) => documentPayload(d)) }, 200);
+				}),
+			POST: (req) =>
+				handle("ingest_document", req, async () => {
+					const tenantId = tenantFrom(req);
+					try {
+						const formData = await req.formData();
+						const file = formData.get("file");
+						if (!(file instanceof File)) {
+							return json({ error: "No 'file' part provided" }, 400);
+						}
+
+						const isPdf =
+							file.type === "application/pdf" ||
+							file.name.toLowerCase().endsWith(".pdf");
+						if (!isPdf) {
+							log.warn(
+								{ event: "ingest_rejected", tenantId, filename: file.name, contentType: file.type },
+								"rejected non-PDF upload",
+							);
+							return json({ error: "Only PDF files are supported" }, 400);
+						}
+
+						const bytes = new Uint8Array(await file.arrayBuffer());
+						const contentHash = new Bun.CryptoHasher("sha256")
+							.update(bytes)
+							.digest("hex");
+
+						log.info(
+							{
+								event: "ingest_received",
+								tenantId,
+								filename: file.name,
+								sizeBytes: bytes.length,
+								contentHash: contentHash.slice(0, 12),
+							},
+							"upload received",
+						);
+
+						const existing = await documentRepository.findActiveByHash(
+							tenantId,
+							contentHash,
+						);
+						if (existing && existing.status !== "failed") {
+							log.info(
+								{ event: "ingest_dedup_hit", tenantId, documentId: existing.id },
+								"duplicate upload, returning existing document",
+							);
+							return json(
+								{
+									error: "This document has already been ingested",
+									documentId: existing.id,
+								},
+								409,
+							);
+						}
+
+						const documentId = existing?.id ?? crypto.randomUUID();
+						const key = existing?.objectKey ?? objectKey(tenantId, contentHash);
+
+						if (existing) {
+							log.info(
+								{ event: "ingest_retry", tenantId, documentId },
+								"re-ingesting previously failed document",
+							);
+							await ingestQueue.remove(documentId);
+							await documentRepository.setStatus(documentId, {
+								status: "queued",
+								error: null,
+								completedAt: null,
+							});
+						} else {
+							await documentRepository.create({
+								id: documentId,
+								tenantId,
+								filename: file.name,
+								contentType: file.type,
+								sizeBytes: bytes.length,
+								contentHash,
+								objectKey: key,
+							});
+							log.info(
+								{ event: "document_created", tenantId, documentId },
+								"document row created",
+							);
+						}
+
+						const uploadStarted = performance.now();
+						await r2.uploadObject(key, bytes, "application/pdf");
+						log.info(
+							{
+								event: "object_uploaded",
+								tenantId,
+								documentId,
+								objectKey: key,
+								sizeBytes: bytes.length,
+								durationMs: Math.round(performance.now() - uploadStarted),
+							},
+							"uploaded object to R2",
+						);
+
+						try {
+							const { jobId } = await ingestQueue.enqueue({
+								documentId,
+								tenantId,
+								objectKey: key,
+							});
+							log.info(
+								{ event: "ingest_enqueued", tenantId, documentId, jobId },
+								"ingest job enqueued",
+							);
+						} catch (error) {
+							await documentRepository.setStatus(documentId, {
+								status: "failed",
+								error: error instanceof Error ? error.message : String(error),
+							});
+							log.error(
+								{ event: "ingest_enqueue_failed", tenantId, documentId, error },
+								"failed to enqueue ingest job",
+							);
+							throw error;
+						}
+
 						return json(
 							{
-								error: "This document has already been ingested",
-								documentId: existing.id,
+								documentId,
+								status: "queued",
+								tenantId,
 							},
-							409,
+							202,
 						);
-					}
-
-					const documentId = existing?.id ?? crypto.randomUUID();
-					const key = existing?.objectKey ?? objectKey(tenantId, contentHash);
-
-					if (existing) {
-						await ingestQueue.remove(documentId);
-						await documentRepository.setStatus(documentId, {
-							status: "queued",
-							error: null,
-							completedAt: null,
-						});
-					} else {
-						await documentRepository.create({
-							id: documentId,
-							tenantId,
-							filename: file.name,
-							contentType: file.type,
-							sizeBytes: bytes.length,
-							contentHash,
-							objectKey: key,
-						});
-					}
-
-					await r2.uploadObject(key, bytes, "application/pdf");
-
-					try {
-						await ingestQueue.enqueue({ documentId, tenantId, objectKey: key });
 					} catch (error) {
-						await documentRepository.setStatus(documentId, {
-							status: "failed",
-							error: error instanceof Error ? error.message : String(error),
-						});
-						throw error;
+						log.error(
+							{ event: "ingest_request_failed", tenantId, error },
+							"ingest request failed",
+						);
+						return json({ error: "Failed to ingest document" }, 500);
 					}
-
-					return json(
-						{
-							documentId,
-							status: "queued",
-							tenantId,
-						},
-						202,
-					);
-				} catch (error) {
-					console.error({ event: "ingest_request_failed", error });
-					return json({ error: "Failed to ingest document" }, 500);
-				}
-			},
+				}),
 		},
 		"/api/ingest/:id": {
 			OPTIONS: () => new Response(null, { headers: CORS_HEADERS }),
-			DELETE: async (req) => {
-				const tenantId = tenantFrom(req);
-				const document = await documentRepository.getById(req.params.id);
-				if (!document || document.tenantId !== tenantId) {
-					return json({ error: "Not found" }, 404);
-				}
+			DELETE: (req) =>
+				handle("delete_document", req, async () => {
+					const tenantId = tenantFrom(req);
+					const document = await documentRepository.getById(req.params.id);
+					if (!document || document.tenantId !== tenantId) {
+						return json({ error: "Not found" }, 404);
+					}
 
-				await chunkRepository.deleteByDocumentId(tenantId, document.id);
-				await documentRepository.deleteById(tenantId, document.id);
-				try {
-					await r2.deleteObject(document.objectKey);
-				} catch (error) {
-					console.error({
-						event: "object_delete_failed",
-						objectKey: document.objectKey,
-						error,
+					const deletedChunks =
+						await chunkRepository.deleteByDocumentId(tenantId, document.id);
+					const deleted = await documentRepository.deleteById(
+						tenantId,
+						document.id,
+					);
+					try {
+						await r2.deleteObject(document.objectKey);
+					} catch (error) {
+						log.error(
+							{
+								event: "object_delete_failed",
+								tenantId,
+								documentId: document.id,
+								objectKey: document.objectKey,
+								error,
+							},
+							"failed to delete object from R2",
+						);
+					}
+
+					log.info(
+						{
+							event: "document_deleted",
+							tenantId,
+							documentId: document.id,
+							filename: document.filename,
+							chunksDeleted: deletedChunks,
+							objectKey: document.objectKey,
+							rowDeleted: deleted,
+						},
+						"document deleted",
+					);
+
+					return new Response(null, {
+						status: 204,
+						headers: CORS_HEADERS,
 					});
-				}
-
-				return new Response(null, {
-					status: 204,
-					headers: CORS_HEADERS,
-				});
-			},
+				}),
 		},
 		"/api/ingest/status/:id": {
 			OPTIONS: () => new Response(null, { headers: CORS_HEADERS }),
-			GET: async (req) => {
-				const tenantId = tenantFrom(req);
-				const document = await documentRepository.getById(req.params.id);
-				if (!document || document.tenantId !== tenantId) {
-					return json({ error: "Not found" }, 404);
-				}
-				return json(documentPayload(document), 200);
-			},
+			GET: (req) =>
+				handle("document_status", req, async () => {
+					const tenantId = tenantFrom(req);
+					const document = await documentRepository.getById(req.params.id);
+					if (!document || document.tenantId !== tenantId) {
+						return json({ error: "Not found" }, 404);
+					}
+					return json(documentPayload(document), 200);
+				}),
 		},
 	},
 });
 
-console.log(`Frontdesk API running on http://localhost:${PORT}`);
+log.info({ event: "listening", port: PORT }, `API listening on :${PORT}`);
