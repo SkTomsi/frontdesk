@@ -6,23 +6,31 @@ A self-hostable SaaS where users ingest their company docs and deploy intelligen
 
 ## Phase 01 — RAG Foundation *(current)*
 
-The core retrieval pipeline. Documents are ingested, split into chunks, embedded into vectors, and stored in PostgreSQL with pgvector for similarity search. When a user asks a question, the system retrieves the most relevant chunks and feeds them as context to an LLM, which generates a structured answer with confidence scoring and cited sources.
+A self-hostable, **distributed** RAG pipeline. PDFs are uploaded through a web UI, stored in Cloudflare R2, and processed asynchronously by a separate BullMQ worker that parses, hierarchically chunks, and embeds them into PostgreSQL/pgvector. When a user asks a question, the system retrieves the most relevant tenant-scoped chunks and feeds parent context to an LLM, which streams an answer with cited sources. Documents can be listed, monitored by status, and deleted.
 
 **Todo:**
 - [x] Document ingestion and chunking with LangChain text splitters
-- [x] Embedding generation with Google Gemini
+- [x] Hierarchical chunking (embedded children matched; parents used as answer context)
+- [x] Embedding generation with Google Gemini (`gemini-embedding-001`, 1536-dim)
 - [x] PostgreSQL-backed vector store with pgvector via Drizzle ORM
 - [x] Structured LLM output with Zod schemas
 - [x] Prompt templates separated from logic
 - [x] Retry with exponential backoff on embedding API
 - [x] Docker Compose for database (TimescaleDB with pgvector)
 - [x] Drizzle ORM for type-safe database access
-- [ ] Multi-document ingestion from various formats (PDF, Markdown, HTML)
-- [ ] Document deletion and re-ingestion workflow
+- [x] **PDF ingestion pipeline** — upload → R2 → BullMQ queue → worker → parse → chunk → embed → upsert → status polling
+- [x] **Cloudflare R2 object storage** for source files
+- [x] **Document management workflow** — list, status, and hard delete (chunks + R2 object)
+- [x] **Deduplication** by content hash (per tenant) and **retry-after-failure** re-ingest
+- [x] **Tenant scoping** via `X-Tenant-ID` header at every layer
+- [x] **Document management UI** (upload, list, status polling, delete)
+- [x] **Structured logging** (pino: colorized dev output, JSON in prod)
+- [ ] Multi-format ingestion (Markdown, HTML, Notion/Confluence export) — only PDF so far
 - [ ] Embedding model configuration per workspace
 - [ ] Vector index tuning for performance at scale
+- [ ] Upload guards (size/page limits) and dedup race hardening
 
-**Concepts:** RAG, vector embeddings, cosine similarity, chunking strategies, structured output, prompt engineering, pgvector, Drizzle ORM
+**Concepts:** RAG, vector embeddings, cosine similarity, hierarchical chunking, structured output, prompt engineering, pgvector, Drizzle ORM, BullMQ, Redis, distributed workers, object storage, tenant isolation
 
 ---
 

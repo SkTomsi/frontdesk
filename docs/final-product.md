@@ -158,7 +158,7 @@ This project demonstrates the *core FDE competency*: deploying autonomous AI int
 - **Runtime:** Bun (fast cold start, low memory, ideal for containerized deployments)
 - **Agent Framework:** LangGraph (state machines for reliable multi-step reasoning)
 - **LLM:** Groq (fast inference, structured output via Zod)
-- **Embeddings:** Google Gemini (3072-dim vectors, strong semantic retrieval)
+- **Embeddings:** Google Gemini (`gemini-embedding-001`, 1536-dim vectors, strong semantic retrieval)
 - **Vector Store:** PostgreSQL + pgvector (production battle-tested, no separate infra)
 - **ORM:** Drizzle ORM (type-safe, Bun-native SQL adapter)
 - **Frontend:** Next.js 15 + Tailwind v4 + shadcn (low-code chat UI for demos)
@@ -169,11 +169,14 @@ This project demonstrates the *core FDE competency*: deploying autonomous AI int
 
 ## Implementation Roadmap
 
-### Stage 1: Agent Core (Current)
-- [x] RAG pipeline (ingest, chunk, embed, retrieve)
-- [x] Structured LLM output with confidence scoring
+### Stage 1: RAG Foundation (Current)
+- [x] Distributed document ingestion — API → R2 → BullMQ queue → worker → parse → chunk → embed → pgvector
+- [x] Hierarchical chunking (embedded children matched; parents as answer context)
+- [x] Document management — upload, list, status polling, hard delete
+- [x] Tenant scoping via `X-Tenant-ID` header
 - [x] Streaming SSE responses
 - [x] Chat UI with source attribution
+- [ ] **Structured, confidence-scored answers** — Zod `SupportAnswer` schema defined but not yet wired into the ask endpoint (currently streams freeform text)
 - [ ] **LangGraph agent with tool-calling** — replaces single-shot RAG with reasoning loops
 - [ ] **Intent classifier** — categorize incoming requests before routing
 - [ ] **Tool registry** — plugable tool interface (DB query, API call, web search)

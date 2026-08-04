@@ -86,8 +86,8 @@ The product narrative isn't "better search." It's "a receptionist that never sle
 
 | Area | Improvement |
 |---|---|
-| **Multi-format ingestion** | PDF, Markdown, HTML, Notion export, Confluence export, plain text. Currently only handles pre-chunked text. |
-| **Document management UI** | Upload, delete, list, and search documents from the frontend. Currently seed-only. |
+| **Multi-format ingestion** | PDF, Markdown, HTML, Notion export, Confluence export, plain text. Currently handles PDFs via the async pipeline (R2 → BullMQ → worker); other formats pending. |
+| **Document management UI** | Upload, list, status polling, and delete from the frontend — implemented. Next: per-document metadata editing and re-ingestion controls. |
 | **Document-level metadata** | Track source document name, upload date, version. Currently only chunk-level metadata. |
 | **Conversation memory** | Short-term (windowed) + long-term (summarized) memory via LangGraph. Currently stateless. |
 | **Query decomposition** | Break "What's the refund policy and how do I cancel?" into two retrievals + one synthesis. |
