@@ -1,8 +1,13 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import { JetBrains_Mono } from "next/font/google";
+import { Inter, JetBrains_Mono } from "next/font/google";
 import { cn } from "@/lib/utils";
 import { Providers } from "./providers";
+
+const inter = Inter({
+	subsets: ["latin"],
+	variable: "--font-sans",
+});
 
 const jetbrainsMono = JetBrains_Mono({
 	subsets: ["latin"],
@@ -20,8 +25,11 @@ export default function RootLayout({
 	children: React.ReactNode;
 }) {
 	return (
-		<html lang="en" className={cn("font-mono", jetbrainsMono.variable)}>
-			<body className="max-w-3xl mx-auto">
+		<html
+			lang="en"
+			className={cn("font-sans", inter.variable, jetbrainsMono.variable)}
+		>
+			<body className="min-h-dvh bg-background text-foreground">
 				<Providers>{children}</Providers>
 			</body>
 		</html>

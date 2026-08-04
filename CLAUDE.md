@@ -115,3 +115,15 @@ bun --hot ./index.ts
 ```
 
 For more information, read the Bun API docs in `node_modules/bun-types/docs/**.mdx`.
+
+## Workflow: wind down after each loop
+
+After every build/implementation loop (i.e. at the end of a working session or a chunk of work), leave the machine clean so the user can test on their own:
+
+1. Stop any dev servers, API, worker, or ports started during the session (e.g. frontend `3000`, API `3003`). Verify with `nc -z localhost <port>` or `lsof -i`.
+2. Clear build caches:
+   - `apps/frontend/.next`
+   - `apps/frontend/tsconfig.tsbuildinfo`
+   - `.turbo` (repo root and app dirs)
+   - `node_modules/.cache`
+3. Do not leave background processes running.

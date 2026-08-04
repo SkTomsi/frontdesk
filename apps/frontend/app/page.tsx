@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ChatHeader } from "@/components/chat/chat-header";
+import { AppHeader } from "@/components/app-header";
 import { ChatInput } from "@/components/chat/chat-input";
 import type { MessageData } from "@/components/chat/message-list";
 import { MessageList } from "@/components/chat/message-list";
@@ -76,9 +76,13 @@ export default function Home() {
 	}
 
 	return (
-		<div className="flex h-dvh flex-col border border-x">
-			<ChatHeader />
-			<MessageList messages={messages} />
+		<div className="flex h-dvh flex-col">
+			<AppHeader />
+			<MessageList
+				messages={messages}
+				streaming={streaming}
+				onSuggestion={(q) => setInput(q)}
+			/>
 			<ChatInput
 				value={input}
 				onChange={setInput}

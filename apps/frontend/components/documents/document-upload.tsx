@@ -2,6 +2,7 @@
 
 import { useQueryClient } from "@tanstack/react-query";
 import { useRef, useState } from "react";
+import { FilePdf, UploadSimple } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import type { DocumentStatus } from "@/lib/api";
@@ -70,7 +71,7 @@ export function DocumentUpload() {
 	const busy = state.phase === "uploading" || state.phase === "processing";
 
 	return (
-		<form onSubmit={handleSubmit} className="flex items-center gap-2">
+		<form onSubmit={handleSubmit} className="space-y-3">
 			<input
 				ref={inputRef}
 				type="file"
@@ -80,34 +81,46 @@ export function DocumentUpload() {
 					setFile(e.target.files?.[0] ?? null);
 					setState({ phase: "idle" });
 				}}
-				className="h-8 w-full min-w-0 border border-input bg-transparent px-2.5 py-1 text-xs outline-none file:mr-2 file:h-6 file:border-0 file:bg-transparent file:px-1 file:text-xs file:font-medium file:text-foreground"
+				className="hidden"
 			/>
-			<Button type="submit" disabled={busy || !file} className="shrink-0">
-				{state.phase === "uploading" ? "Uploading..." : "Upload"}
-			</Button>
-			{state.phase === "processing" && (
-				<span className="flex items-center gap-2 text-xs text-muted-foreground">
-					<Spinner />
-					{state.status === "processing"
-						? "Embedding..."
-						: state.status === "queued"
-							? "Queued..."
-							: "Failed"}
-				</span>
-			)}
-			{state.phase === "error" && (
-				<span className="text-xs text-destructive">{state.message}</span>
-			)}
-			{state.phase === "error" && (
+			<div className="flex flex-col gap-2 sm:flex-row sm:items-center">
 				<Button
 					type="button"
-					variant="ghost"
-					size="sm"
-					onClick={reset}
-					className="shrink-0"
+					variant="outline"
+					disabled={busy}
+					onClick={() => inputRef.current?.click()}
+					className="gap-2 justify-start sm:min-w-56"
 				>
-					Clear
+					<FilePdf className="size-4 shrink-0 text-muted-foreground" />
+					<span className="truncate">{file ? file.name : "Choose a PDF"}</span>
 				</Button>
+				<Button type="submit" disabled={busy || !file} className="gap-2">
+					{state.phase === "uploading" ? (
+						<Spinner className="size-4" />
+					) : (
+						<UploadSimple weight="bold" className="size-4" />
+					)}
+					{state.phase === "uploading" ? "Uploading…" : "Upload"}
+				</Button>
+			</div>
+			{state.phase === "processing" && (
+				<div className="flex items-center gap-2 text-xs text-muted-foreground">
+					<Spinner className="size-3.5" />
+					{state.status === "processing"
+						? "Embedding chunks"
+						: state.status === "queued"
+							? "Queued for processing"
+							: "Processing failed"}
+					{state.chunkCount != null && ` · ${state.chunkCount} chunks`}
+				</div>
+			)}
+			{state.phase === "error" && (
+				<div className="flex items-center justify-between gap-3">
+					<span className="text-xs text-destructive">{state.message}</span>
+					<Button type="button" variant="ghost" size="sm" onClick={reset}>
+						Clear
+					</Button>
+				</div>
 			)}
 		</form>
 	);

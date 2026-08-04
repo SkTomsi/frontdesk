@@ -1,9 +1,18 @@
+import { BookOpen } from "@phosphor-icons/react";
+import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
 import type { SourceInfo } from "@/components/chat/message-list";
 
 function scoreColor(score: number): string {
-	if (score >= 0.82) return "bg-emerald-500/15 text-emerald-600 [&>span]:bg-emerald-500";
-	if (score >= 0.72) return "bg-amber-500/15 text-amber-600 [&>span]:bg-amber-500";
-	return "bg-red-500/15 text-red-600 [&>span]:bg-red-500";
+	if (score >= 0.82) return "text-emerald-600 dark:text-emerald-400";
+	if (score >= 0.72) return "text-amber-600 dark:text-amber-400";
+	return "text-red-600 dark:text-red-400";
+}
+
+function scoreDot(score: number): string {
+	if (score >= 0.82) return "bg-emerald-500";
+	if (score >= 0.72) return "bg-amber-500";
+	return "bg-red-500";
 }
 
 export function SourceBadges({ sources }: { sources: SourceInfo[] }) {
@@ -18,13 +27,19 @@ export function SourceBadges({ sources }: { sources: SourceInfo[] }) {
 	return (
 		<div className="flex flex-wrap gap-1.5">
 			{[...seen.entries()].map(([title, score]) => (
-				<span
+				<Badge
 					key={title}
-					className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium ${scoreColor(score)}`}
+					variant="outline"
+					title={`Similarity ${Math.round(score * 100)}%`}
+					className={cn(
+						"gap-1.5 px-2.5 py-1 text-[11px] font-medium text-foreground/80",
+						scoreColor(score),
+					)}
 				>
-					<span className="size-1.5 rounded-full" />
+					<BookOpen className="size-3 text-muted-foreground" />
 					{title}
-				</span>
+					<span className={cn("size-1.5 rounded-full", scoreDot(score))} />
+				</Badge>
 			))}
 		</div>
 	);

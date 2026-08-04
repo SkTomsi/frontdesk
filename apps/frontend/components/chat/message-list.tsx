@@ -7,6 +7,7 @@ import {
 	Message,
 	MessageAvatar,
 	MessageContent,
+	MessageHeader,
 } from "@/components/ui/message";
 import {
 	MessageScroller,
@@ -31,51 +32,73 @@ export interface MessageData {
 
 interface MessageListProps {
 	messages: MessageData[];
+	streaming?: boolean;
+	onSuggestion?: (question: string) => void;
 }
 
-export function MessageList({ messages }: MessageListProps) {
+export function MessageList({
+	messages,
+	streaming = false,
+	onSuggestion,
+}: MessageListProps) {
+	const lastId = messages.length > 0 ? messages[messages.length - 1].id : null;
+
 	return (
 		<MessageScrollerProvider autoScroll scrollPreviousItemPeek={64}>
 			<MessageScroller className="flex-1">
-				<MessageScrollerViewport className="max-w-3xl mx-auto py-8 px-4">
+				<MessageScrollerViewport className="mx-auto w-full max-w-2xl px-4 py-8">
 					<MessageScrollerContent>
 						{messages.length === 0 && (
 							<MessageScrollerItem className="my-auto">
-								<EmptyState />
+								<EmptyState onSuggestion={onSuggestion} />
 							</MessageScrollerItem>
 						)}
-						{messages.map((msg) => (
-							<MessageScrollerItem
-								key={msg.id}
-								messageId={msg.id}
-								scrollAnchor={msg.role === "user"}
-							>
-								<Message align={msg.role === "user" ? "end" : "start"}>
-									<MessageAvatar>
-										{msg.role === "user" ? <UserAvatar /> : <BotAvatar />}
-									</MessageAvatar>
-									<MessageContent>
-										{msg.role === "user" && (
+						{messages.map((msg, index) => {
+							const streamingThis =
+								streaming && msg.role === "assistant" && msg.id === lastId;
+							return (
+								<MessageScrollerItem
+									key={msg.id}
+									messageId={msg.id}
+									scrollAnchor={msg.role === "user"}
+									className="fd-message-in"
+									style={{ animationDelay: `${Math.min(index * 45, 270)}ms` }}
+								>
+									<Message align={msg.role === "user" ? "end" : "start"}>
+										<MessageAvatar>
+											{msg.role === "user" ? <UserAvatar /> : <BotAvatar />}
+										</MessageAvatar>
+										<MessageContent>
+											<MessageHeader>
+												{msg.role === "user" ? "You" : "Frontdesk"}
+											</MessageHeader>
 											<Bubble
-												variant={msg.role === "user" ? "default" : "secondary"}
+												variant={msg.role === "user" ? "default" : "outline"}
 											>
-												<BubbleContent className="rounded-2xl p-4 text-sm">
-													{msg.content}
+												<BubbleContent className="p-4 text-sm leading-relaxed">
+													{msg.role === "user" ? (
+														msg.content
+													) : (
+														<>
+															<MarkdownContent content={msg.content} />
+															{streamingThis && (
+																<span
+																	aria-hidden
+																	className="fd-caret ml-0.5 inline-block h-4 w-1.5 rounded-sm bg-primary/60 align-text-bottom"
+																/>
+															)}
+														</>
+													)}
 												</BubbleContent>
 											</Bubble>
-										)}
-										{msg.role === "assistant" && (
-											<div className="rounded-2xl bg-secondary/50 p-4 text-sm">
-												<MarkdownContent content={msg.content} />
-											</div>
-										)}
-										{msg.sources && msg.sources.length > 0 && (
-											<SourceBadges sources={msg.sources} />
-										)}
-									</MessageContent>
-								</Message>
-							</MessageScrollerItem>
-						))}
+											{msg.sources && msg.sources.length > 0 && (
+												<SourceBadges sources={msg.sources} />
+											)}
+										</MessageContent>
+									</Message>
+								</MessageScrollerItem>
+							);
+						})}
 					</MessageScrollerContent>
 				</MessageScrollerViewport>
 				<MessageScrollerButton />
