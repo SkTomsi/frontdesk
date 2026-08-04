@@ -1,13 +1,13 @@
-export { ChunkRepository } from "./chunks";
 export type {
 	NewChunk,
 	SearchResultRow,
 	StoredChunk,
 } from "./chunks";
-export { DocumentRepository } from "./documents";
+export { ChunkRepository } from "./chunks";
 export type {
 	DocumentRecord,
 	DocumentStatus,
 	DocumentStatusUpdate,
 	NewDocument,
 } from "./documents";
+export { DocumentRepository } from "./documents";

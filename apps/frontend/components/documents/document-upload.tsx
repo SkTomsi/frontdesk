@@ -11,7 +11,6 @@ type UploadState =
 	| { phase: "idle" }
 	| { phase: "uploading" }
 	| { phase: "processing"; status: DocumentStatus; chunkCount: number | null }
-	| { phase: "done"; chunkCount: number | null }
 	| { phase: "error"; message: string };
 
 const POLL_INTERVAL_MS = 1500;
@@ -46,7 +45,7 @@ export function DocumentUpload() {
 					chunkCount: summary.chunkCount,
 				});
 				if (summary.status === "completed") {
-					setState({ phase: "done", chunkCount: summary.chunkCount });
+					reset();
 					break;
 				}
 				if (summary.status === "failed") {
@@ -96,15 +95,10 @@ export function DocumentUpload() {
 							: "Failed"}
 				</span>
 			)}
-			{state.phase === "done" && (
-				<span className="text-xs text-muted-foreground">
-					Done ({state.chunkCount} chunks)
-				</span>
-			)}
 			{state.phase === "error" && (
 				<span className="text-xs text-destructive">{state.message}</span>
 			)}
-			{(state.phase === "done" || state.phase === "error") && (
+			{state.phase === "error" && (
 				<Button
 					type="button"
 					variant="ghost"

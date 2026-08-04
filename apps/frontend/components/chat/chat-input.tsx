@@ -1,3 +1,6 @@
+"use client";
+
+import { useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
@@ -14,10 +17,17 @@ export function ChatInput({
 	onSubmit,
 	disabled,
 }: ChatInputProps) {
+	const inputRef = useRef<HTMLInputElement>(null);
+
+	useEffect(() => {
+		if (!disabled) inputRef.current?.focus();
+	}, [disabled]);
+
 	return (
 		<div className="p-4 shrink-0">
 			<form onSubmit={onSubmit} className="flex gap-2 max-w-3xl mx-auto h-14">
 				<Input
+					ref={inputRef}
 					value={value}
 					onChange={(e) => onChange(e.target.value)}
 					placeholder="Ask a question..."
