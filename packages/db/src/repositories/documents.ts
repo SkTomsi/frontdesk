@@ -1,4 +1,4 @@
-import { eq, and } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import { createDb } from "../index";
 import { documents } from "../schema";
 
@@ -107,10 +107,38 @@ export class DocumentRepository {
 			.update(documents)
 			.set({
 				status: update.status,
-				chunkCount: update.chunkCount ?? undefined,
-				error: update.error ?? undefined,
-				completedAt: update.completedAt ?? undefined,
+				chunkCount:
+					update.chunkCount === undefined ? undefined : update.chunkCount,
+				error: update.error === undefined ? undefined : update.error,
+				completedAt:
+					update.completedAt === undefined ? undefined : update.completedAt,
 			})
 			.where(eq(documents.id, id));
+	}
+
+	async listByTenant(
+		tenantId: string,
+		options: { status?: DocumentStatus; limit?: number; offset?: number } = {},
+	): Promise<DocumentRecord[]> {
+		const conditions = [eq(documents.tenantId, tenantId), eq(documents.isActive, true)];
+		if (options.status) {
+			conditions.push(eq(documents.status, options.status));
+		}
+		const rows = await this.db
+			.select()
+			.from(documents)
+			.where(and(...conditions))
+			.orderBy(desc(documents.createdAt))
+			.limit(options.limit ?? 100)
+			.offset(options.offset ?? 0);
+		return rows.map(toRecord);
+	}
+
+	async deleteById(tenantId: string, id: string): Promise<boolean> {
+		const rows = await this.db
+			.delete(documents)
+			.where(and(eq(documents.id, id), eq(documents.tenantId, tenantId)))
+			.returning({ id: documents.id });
+		return rows.length > 0;
 	}
 }

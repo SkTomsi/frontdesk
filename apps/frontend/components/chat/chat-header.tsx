@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 export function ChatHeader() {
 	return (
 		<header className="border-b px-4 py-3 shrink-0">
@@ -20,6 +22,14 @@ export function ChatHeader() {
 				<div>
 					<h1 className="text-lg font-bold">Frontdesk</h1>
 					<p className="text-xs text-muted-foreground">AI-powered support</p>
+				</div>
+				<div className="ml-auto">
+					<Link
+						href="/documents"
+						className="text-xs text-muted-foreground hover:text-foreground"
+					>
+						Documents
+					</Link>
 				</div>
 			</div>
 		</header>

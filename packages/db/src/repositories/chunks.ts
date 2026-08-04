@@ -279,6 +279,17 @@ export class ChunkRepository {
 			);
 	}
 
+	async deleteByDocumentId(tenantId: string, documentId: string): Promise<void> {
+		await this.db
+			.delete(documentChunks)
+			.where(
+				and(
+					eq(documentChunks.tenantId, tenantId),
+					eq(documentChunks.documentId, documentId),
+				),
+			);
+	}
+
 	async close(): Promise<void> {
 		createDb().client.close();
 	}

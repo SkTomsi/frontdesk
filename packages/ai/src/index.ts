@@ -1,5 +1,4 @@
 export { config } from "./config";
-export { sampleDocuments } from "./data/sample-docs";
 export type { PromptVariables } from "./prompts";
 export { supportPrompt } from "./prompts";
 export type { SupportAnswer as SupportAnswerType } from "./schemas";

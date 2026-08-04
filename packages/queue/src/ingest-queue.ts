@@ -10,6 +10,7 @@ export interface IngestJob {
 
 export interface IngestQueue {
 	enqueue(job: IngestJob): Promise<{ jobId: string }>;
+	remove(jobId: string): Promise<void>;
 	close(): Promise<void>;
 }
 
@@ -28,6 +29,10 @@ export function createIngestQueue(
 				removeOnFail: 500,
 			});
 			return { jobId: added.id ?? job.documentId };
+		},
+
+		async remove(jobId) {
+			await queue.remove(jobId);
 		},
 
 		async close() {

@@ -21,9 +21,10 @@ export async function retrieveContext(
 	embeddings: EmbeddingService,
 	vectorStore: VectorStore,
 	chunkRepository: ChunkRepository,
+	tenantId?: string,
 ): Promise<RetrievalResult> {
 	const queryEmbedding = await embeddings.embedQuery(question);
-	const results = await vectorStore.similaritySearch(queryEmbedding, 3);
+	const results = await vectorStore.similaritySearch(queryEmbedding, 3, tenantId);
 
 	const normalized = results.map((r) => ({
 		...r,
