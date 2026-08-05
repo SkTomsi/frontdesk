@@ -9,18 +9,22 @@ import { performance } from "node:perf_hooks";
 
 const API_BASE = process.env.API_URL ?? "http://localhost:3003";
 const TENANT = process.env.X_TENANT_ID ?? "default";
+const endpointArg = process.argv.indexOf("--endpoint");
+const RAG_PATH = endpointArg !== -1 && process.argv[endpointArg + 1] === "simple"
+	? "/api/ask/simple"
+	: "/api/ask";
 
 const QUESTIONS = [
-	"What is the core idea of the meal prep system?",
-	"What are the fixed and rotating components of a meal formula?",
-	"How often does the batch cycle run?",
-	"What does the breakfast formula consist of?",
-	"How long does a batch of boiled eggs last?",
-	"What are Rijo John's core skills?",
-	"Which 3D visualization tools does Rijo John use?",
-	"What is the lunch formula?",
-	"Where is Rijo John based?",
-	"What was Rijo John doing in 2023?",
+	"What did Tomcy do at BrewlabsHQ?",
+	"Which open source projects has Tomcy contributed to?",
+	"What are Tomcy's contact details?",
+	"What is Tomcy's current role?",
+	"How long did Tomcy work at BrewlabsHQ?",
+	"What bounty did Tomcy win on Superteam Earn?",
+	"What does Tomcy say about onboarding UI work?",
+	"Which platforms is Tomcy active on?",
+	"Where can I find Tomcy's portfolio?",
+	"What is Tomcy's email address?",
 ];
 
 /** Free tier caps at 8000 tokens/min; pace the asks so consecutive ones don't 429. */
@@ -55,7 +59,7 @@ function emptyUsage(): UsageSummary {
 
 async function ask(question: string): Promise<AskResult> {
 	const started = performance.now();
-	const res = await fetch(`${API_BASE}/api/ask`, {
+	const res = await fetch(`${API_BASE}${RAG_PATH}`, {
 		method: "POST",
 		headers: { "Content-Type": "application/json", "X-Tenant-ID": TENANT },
 		body: JSON.stringify({ question }),
@@ -167,7 +171,9 @@ async function main(): Promise<void> {
 		n = Math.min(Math.max(parseInt(process.argv[nIdx + 1]!, 10), 1), QUESTIONS.length);
 	}
 
-	console.log(`Measuring against ${API_BASE} (tenant "${TENANT}"), ${n} question(s)...\n`);
+	console.log(
+		`Measuring against ${API_BASE}${RAG_PATH} (tenant "${TENANT}"), ${n} question(s)...\n`,
+	);
 
 	const results: AskResult[] = [];
 	for (const [i, q] of QUESTIONS.slice(0, n).entries()) {

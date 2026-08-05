@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { AppHeader } from "@/components/app-header";
 import { ChatInput } from "@/components/chat/chat-input";
+import type { RetrievalMode } from "@/components/chat/mode-switcher";
 import type { MessageData } from "@/components/chat/message-list";
 import { MessageList } from "@/components/chat/message-list";
 import { parseSSEStream } from "@/lib/sse";
@@ -15,6 +16,8 @@ export default function Home() {
 	const [messages, setMessages] = useState<MessageData[]>([]);
 	const [input, setInput] = useState("");
 	const [streaming, setStreaming] = useState(false);
+	const [thinking, setThinking] = useState(false);
+	const [mode, setMode] = useState<RetrievalMode>("graph");
 
 	async function handleSubmit(e: React.FormEvent) {
 		e.preventDefault();
@@ -30,6 +33,7 @@ export default function Home() {
 			{ id: assistantId, role: "assistant", content: "" },
 		]);
 		setStreaming(true);
+		setThinking(true);
 
 		const update = (
 			patch:
@@ -45,7 +49,8 @@ export default function Home() {
 			);
 
 		try {
-			const res = await fetch(`${API_BASE}/api/ask`, {
+			const endpoint = mode === "simple" ? "/api/ask/simple" : "/api/ask";
+			const res = await fetch(`${API_BASE}${endpoint}`, {
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
 				body: JSON.stringify({ question }),
@@ -56,6 +61,7 @@ export default function Home() {
 			for await (const ev of parseSSEStream(res.body)) {
 				switch (ev.type) {
 					case "assistant_delta":
+						setThinking(false);
 						update((prev) => ({ content: prev.content + ev.text }));
 						break;
 					case "meta":
@@ -63,14 +69,21 @@ export default function Home() {
 							sources: [...(prev.sources || []), { title: ev.source, score: ev.score }],
 						}));
 						break;
+					case "done":
+						setThinking(false);
+						update({ usage: ev.usage });
+						break;
 					case "error":
+						setThinking(false);
 						update({ content: "Sorry, something went wrong." });
 						break;
 				}
 			}
 		} catch {
+			setThinking(false);
 			update({ content: "Sorry, something went wrong." });
 		} finally {
+			setThinking(false);
 			setStreaming(false);
 		}
 	}
@@ -81,6 +94,7 @@ export default function Home() {
 			<MessageList
 				messages={messages}
 				streaming={streaming}
+				thinking={thinking}
 				onSuggestion={(q) => setInput(q)}
 			/>
 			<ChatInput
@@ -88,6 +102,8 @@ export default function Home() {
 				onChange={setInput}
 				onSubmit={handleSubmit}
 				disabled={streaming}
+				mode={mode}
+				onModeChange={setMode}
 			/>
 		</div>
 	);

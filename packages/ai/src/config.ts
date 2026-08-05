@@ -1,7 +1,7 @@
 const CHUNK_SIZE = 500;
 const CHUNK_OVERLAP = 50;
 const EMBEDDING_MODEL = "gemini-embedding-001";
-const LLM_MODEL = "openai/gpt-oss-120b";
+const LLM_MODEL = "llama-3.3-70b-versatile";
 
 // Phase B: candidate count pulled from the vector store before reranking.
 const RETRIEVE_CANDIDATES = {

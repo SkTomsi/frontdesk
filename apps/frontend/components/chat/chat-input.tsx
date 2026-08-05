@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { PaperPlaneRight } from "@phosphor-icons/react";
+import { ModeSwitcher, type RetrievalMode } from "@/components/chat/mode-switcher";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Kbd } from "@/components/ui/kbd";
@@ -18,6 +19,8 @@ interface ChatInputProps {
 	onChange: (value: string) => void;
 	onSubmit: (e: React.FormEvent) => void;
 	disabled: boolean;
+	mode: RetrievalMode;
+	onModeChange: (mode: RetrievalMode) => void;
 }
 
 export function ChatInput({
@@ -25,6 +28,8 @@ export function ChatInput({
 	onChange,
 	onSubmit,
 	disabled,
+	mode,
+	onModeChange,
 }: ChatInputProps) {
 	const inputRef = useRef<HTMLInputElement>(null);
 
@@ -72,9 +77,16 @@ export function ChatInput({
 						</Tooltip>
 					</div>
 				</TooltipProvider>
-				<p className="mt-2 text-center text-[11px] text-muted-foreground">
-					Frontdesk can make mistakes — verify important information.
-				</p>
+				<div className="mt-2.5 flex items-center justify-between gap-3 px-1">
+					<ModeSwitcher
+						mode={mode}
+						onModeChange={onModeChange}
+						disabled={disabled}
+					/>
+					<p className="text-right text-[11px] text-muted-foreground">
+						Frontdesk can make mistakes — verify important information.
+					</p>
+				</div>
 			</form>
 		</div>
 	);

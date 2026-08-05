@@ -1,6 +1,7 @@
 export { config } from "./config";
 export type { AgentGraphDeps, AgentStateType } from "./graph";
 export { buildAgentGraph } from "./graph";
+export { formatContext, labelFor } from "./graph/context";
 export type { PromptVariables } from "./prompts";
 export { supportPrompt } from "./prompts";
 export type { SupportAnswer as SupportAnswerType } from "./schemas";

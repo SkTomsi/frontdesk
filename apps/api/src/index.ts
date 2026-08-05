@@ -10,6 +10,7 @@ import { ChunkRepository, DocumentRepository } from "@frontdesk/db";
 import { createLogger } from "@frontdesk/logger";
 import { createIngestQueue } from "@frontdesk/queue";
 import { createR2FromEnv, objectKey } from "@frontdesk/storage";
+import { streamSimpleAnswer } from "./simple-rag";
 import { CORS_HEADERS, STREAM_HEADERS, send } from "./sse";
 
 const PORT = 3003;
@@ -195,6 +196,44 @@ Bun.serve({
 										error,
 									},
 									"answer stream failed",
+								);
+								send(controller, {
+									type: "error",
+									message: "Something went wrong",
+								});
+							} finally {
+								controller.close();
+							}
+						},
+					});
+
+					return new Response(body, { headers: STREAM_HEADERS });
+				}),
+		},
+		"/api/ask/simple": {
+			OPTIONS: () => new Response(null, { headers: CORS_HEADERS }),
+			POST: (req) =>
+				handle("ask_simple", req, async () => {
+					const tenantId = tenantFrom(req);
+					const { question } = (await req.json()) as { question: string };
+
+					const body = new ReadableStream({
+						async start(controller) {
+							try {
+								await streamSimpleAnswer(
+									{ llm, embeddings, vectorStore, chunkRepository },
+									question,
+									tenantId,
+									controller,
+								);
+							} catch (error) {
+								log.error(
+									{
+										event: "ask_simple_stream_error",
+										tenantId,
+										error,
+									},
+									"simple answer stream failed",
 								);
 								send(controller, {
 									type: "error",
