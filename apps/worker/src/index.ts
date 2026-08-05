@@ -24,7 +24,7 @@ const worker = createIngestWorker(
 		const jobLog = log.child({ tenantId, documentId });
 		const started = performance.now();
 
-		jobLog.info({ event: "job_received", objectKey }, "ingest job received");
+		jobLog.info("ingest job received");
 
 		const pdf = await r2.getObject(objectKey);
 		jobLog.info(
@@ -66,7 +66,7 @@ worker.on("failed", (job, error) => {
 	);
 });
 
-log.info({ event: "worker_started" }, "worker listening on the ingest queue");
+log.info("worker listening on the ingest queue");
 
 const shutdown = async () => {
 	await worker.close();

@@ -43,7 +43,10 @@ export class IngestPipeline {
 		const started = performance.now();
 		await chunkRepository.initialize();
 		await documentRepository.setStatus(documentId, { status: "processing" });
-		log.info({ event: "status", status: "processing" }, "marking document as processing");
+		log.info(
+			{ event: "status", status: "processing" },
+			"marking document as processing",
+		);
 
 		try {
 			const parseStarted = performance.now();

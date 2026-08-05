@@ -30,7 +30,7 @@ const agentGraph = buildAgentGraph({
 });
 
 await vectorStore.initialize();
-log.info({ event: "startup", port: PORT }, "vector store initialized");
+log.info("vector store initialized");
 
 function tenantFrom(req: Request): string {
 	return req.headers.get("x-tenant-id") ?? "default";
@@ -81,7 +81,9 @@ async function handle(
 	}
 }
 
-function documentPayload(doc: Awaited<ReturnType<DocumentRepository["getById"]>>) {
+function documentPayload(
+	doc: Awaited<ReturnType<DocumentRepository["getById"]>>,
+) {
 	if (!doc) return null;
 	return {
 		documentId: doc.id,
@@ -209,12 +211,11 @@ Bun.serve({
 					const url = new URL(req.url);
 					const status = url.searchParams.get("status");
 					const docs = await documentRepository.listByTenant(tenantId, {
-						status: (status as "queued" | "processing" | "completed" | "failed") ?? undefined,
+						status:
+							(status as "queued" | "processing" | "completed" | "failed") ??
+							undefined,
 					});
-					log.info(
-						{ event: "documents_listed", tenantId, count: docs.length, status },
-						`listed ${docs.length} document(s)`,
-					);
+					log.info(`listed ${docs.length} document(s)`);
 					return json({ documents: docs.map((d) => documentPayload(d)) }, 200);
 				}),
 			POST: (req) =>
@@ -232,7 +233,12 @@ Bun.serve({
 							file.name.toLowerCase().endsWith(".pdf");
 						if (!isPdf) {
 							log.warn(
-								{ event: "ingest_rejected", tenantId, filename: file.name, contentType: file.type },
+								{
+									event: "ingest_rejected",
+									tenantId,
+									filename: file.name,
+									contentType: file.type,
+								},
 								"rejected non-PDF upload",
 							);
 							return json({ error: "Only PDF files are supported" }, 400);
@@ -260,7 +266,11 @@ Bun.serve({
 						);
 						if (existing && existing.status !== "failed") {
 							log.info(
-								{ event: "ingest_dedup_hit", tenantId, documentId: existing.id },
+								{
+									event: "ingest_dedup_hit",
+									tenantId,
+									documentId: existing.id,
+								},
 								"duplicate upload, returning existing document",
 							);
 							return json(
@@ -276,10 +286,7 @@ Bun.serve({
 						const key = existing?.objectKey ?? objectKey(tenantId, contentHash);
 
 						if (existing) {
-							log.info(
-								{ event: "ingest_retry", tenantId, documentId },
-								"re-ingesting previously failed document",
-							);
+							log.info("re-ingesting previously failed document");
 							await ingestQueue.remove(documentId);
 							await documentRepository.setStatus(documentId, {
 								status: "queued",
@@ -296,10 +303,7 @@ Bun.serve({
 								contentHash,
 								objectKey: key,
 							});
-							log.info(
-								{ event: "document_created", tenantId, documentId },
-								"document row created",
-							);
+							log.info("document row created");
 						}
 
 						const uploadStarted = performance.now();
@@ -365,8 +369,10 @@ Bun.serve({
 						return json({ error: "Not found" }, 404);
 					}
 
-					const deletedChunks =
-						await chunkRepository.deleteByDocumentId(tenantId, document.id);
+					const deletedChunks = await chunkRepository.deleteByDocumentId(
+						tenantId,
+						document.id,
+					);
 					const deleted = await documentRepository.deleteById(
 						tenantId,
 						document.id,
@@ -420,4 +426,4 @@ Bun.serve({
 	},
 });
 
-log.info({ event: "listening", port: PORT }, `API listening on :${PORT}`);
+log.info(`API listening on :${PORT}`);

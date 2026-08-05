@@ -1,6 +1,6 @@
-import { Annotation } from "@langchain/langgraph";
-import type { BaseMessage } from "@langchain/core/messages";
 import type { StoredChunk } from "@frontdesk/db";
+import type { BaseMessage } from "@langchain/core/messages";
+import { Annotation } from "@langchain/langgraph";
 import type { SearchResult } from "../services/vector-store";
 
 export const QueryType = {
