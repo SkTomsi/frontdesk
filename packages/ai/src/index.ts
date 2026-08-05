@@ -13,5 +13,10 @@ export type {
 } from "./services/embedding/types";
 export { Llm } from "./services/llm";
 export { TextSplitter } from "./services/splitter";
+export {
+	type NodeUsage,
+	TokenTracker,
+	type UsageSummary,
+} from "./services/telemetry/token-tracker";
 export type { SearchResult, StoredDocument } from "./services/vector-store";
 export { VectorStore } from "./services/vector-store";

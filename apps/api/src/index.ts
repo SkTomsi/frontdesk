@@ -3,6 +3,7 @@ import {
 	config,
 	EmbeddingService,
 	Llm,
+	TokenTracker,
 	VectorStore,
 } from "@frontdesk/ai";
 import { ChunkRepository, DocumentRepository } from "@frontdesk/db";
@@ -104,22 +105,22 @@ async function streamAnswer(
 	const started = performance.now();
 	log.info({ event: "ask_received", tenantId, question }, "question received");
 
+	const tracker = new TokenTracker();
 	const sendToken = (text: string) => {
 		send(controller, { type: "assistant_delta", text });
 	};
 
 	const result = await agentGraph.invoke(
 		{ query: question, tenantId },
-		{ configurable: { onToken: sendToken } },
+		{ configurable: { onToken: sendToken, tokenTracker: tracker } },
 	);
 
-	const answer = result.finalAnswer;
-	const retrieved = result.retrievedChunks ?? [];
-	const parentChunks = result.parentChunks ?? [];
-	const contextLength = parentChunks.reduce(
-		(total, chunk) => total + chunk.content.length,
-		0,
-	);
+	const usage = tracker.summary();
+	const answer = result.finalAnswer ?? "";
+	const retrieved = result.retrievedResults ?? [];
+	const sources = result.sources ?? [];
+	const citedSources = result.citedSources ?? [];
+	const compressedContext = result.compressedContext;
 
 	log.info(
 		{
@@ -127,39 +128,44 @@ async function streamAnswer(
 			tenantId,
 			question,
 			resultCount: retrieved.length,
-			contextChunks: parentChunks.length,
-			contextLength,
+			contextChunks: sources.length,
+			compressedContextLength: compressedContext?.length ?? 0,
 			iterations: result.iteration,
 			contextScore: result.contextScore,
+			confidence: result.confidence,
+			needsHumanReview: result.needsHumanReview,
+			inputTokens: usage.totalInputTokens,
+			outputTokens: usage.totalOutputTokens,
 			durationMs: Math.round(performance.now() - started),
+			usage,
 		},
 		"agent graph completed",
 	);
 
-	const citedSources = retrieved.filter((r) => {
-		const title = r.document.metadata.title as string;
-		return title && answer.includes(title);
-	});
+	const metaSources =
+		citedSources.length > 0
+			? sources.filter((s) => citedSources.includes(s.title))
+			: sources;
 
 	let totalChars = 0;
-	for (const r of citedSources) {
-		totalChars += r.document.content.length;
+	for (const s of metaSources) {
+		totalChars += s.title.length;
 		send(controller, {
 			type: "meta",
-			source: r.document.metadata.title as string,
-			chunkSize: r.document.content.length,
+			source: s.title,
+			chunkSize: 0,
 			totalChars,
-			score: r.score,
+			score: s.score,
 		});
 	}
 
-	send(controller, { type: "done" });
+	send(controller, { type: "done", usage });
 	log.info(
 		{
 			event: "ask_stream_completed",
 			tenantId,
 			answerLength: answer.length,
-			citedSources: citedSources.length,
+			citedSources: metaSources.length,
 			durationMs: Math.round(performance.now() - started),
 		},
 		"answer streamed",

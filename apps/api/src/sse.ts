@@ -1,7 +1,9 @@
+import type { UsageSummary } from "@frontdesk/ai";
+
 export type StreamEvent =
 	| { type: "meta"; source: string; chunkSize: number; totalChars: number; score: number }
 	| { type: "assistant_delta"; text: string }
-	| { type: "done" }
+	| { type: "done"; usage?: UsageSummary }
 	| { type: "error"; message: string };
 
 export function send(controller: ReadableStreamDefaultController, event: StreamEvent) {

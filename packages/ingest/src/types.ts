@@ -14,6 +14,7 @@ export interface ParentChunk {
 	chunkIndex: number;
 	pageNum: number | null;
 	metadata: Record<string, unknown>;
+	embedding?: null;
 }
 
 export interface ChildChunk {
@@ -23,6 +24,8 @@ export interface ChildChunk {
 	chunkIndex: number;
 	pageNum: number | null;
 	metadata: Record<string, unknown>;
+	/** Averaged sentence embedding — written directly to the vector store. */
+	embedding?: number[];
 }
 
 export interface HierarchicalChunks {

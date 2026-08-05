@@ -1,7 +1,4 @@
-import type { StoredChunk } from "@frontdesk/db";
-import type { BaseMessage } from "@langchain/core/messages";
 import { Annotation } from "@langchain/langgraph";
-import type { SearchResult } from "../services/vector-store";
 
 export const QueryType = {
 	simple_factual: "simple_factual",
@@ -10,6 +7,19 @@ export const QueryType = {
 } as const;
 
 export type QueryType = keyof typeof QueryType;
+
+/** Lightweight retrieval hit — no chunk content travels through graph state. */
+export interface RetrievedResult {
+	id: string;
+	score: number;
+	parentId: string | null;
+}
+
+export interface SourceRef {
+	id: string;
+	title: string;
+	score: number;
+}
 
 export const AgentState = Annotation.Root({
 	query: Annotation<string>,
@@ -22,18 +32,17 @@ export const AgentState = Annotation.Root({
 		default: () => 0,
 	}),
 
-	retrievedChunks: Annotation<SearchResult[]>,
-	parentChunks: Annotation<StoredChunk[]>,
+	retrievedResults: Annotation<RetrievedResult[]>,
+	parentChunkIds: Annotation<string[]>,
+	sources: Annotation<SourceRef[]>,
+	compressedContext: Annotation<string | null>,
 	contextScore: Annotation<number>,
 	contextReason: Annotation<string>,
 
 	finalAnswer: Annotation<string>,
+	citedSources: Annotation<string[]>,
+	confidence: Annotation<string>,
 	needsHumanReview: Annotation<boolean>,
-
-	messages: Annotation<BaseMessage[]>({
-		reducer: (left, right) => left.concat(right),
-		default: () => [],
-	}),
 });
 
 export type AgentStateType = typeof AgentState.State;

@@ -49,6 +49,9 @@ export class IngestPipeline {
 		);
 
 		try {
+			const doc = await documentRepository.getById(documentId);
+			const title = doc?.filename ?? documentId;
+
 			const parseStarted = performance.now();
 			const parsed = await parsePdf(pdf);
 			if (!parsed.fullText.trim()) {
@@ -65,7 +68,7 @@ export class IngestPipeline {
 			);
 
 			const chunkStarted = performance.now();
-			const chunker = new HierarchicalChunker();
+			const chunker = new HierarchicalChunker({ embeddingService });
 			const { parents, children } = await chunker.split(parsed);
 			log.info(
 				{
@@ -74,21 +77,7 @@ export class IngestPipeline {
 					children: children.length,
 					durationMs: Math.round(performance.now() - chunkStarted),
 				},
-				"hierarchical chunking complete",
-			);
-
-			const embedStarted = performance.now();
-			const embeddings = await embeddingService.embedDocuments(
-				children.map((child) => child.content),
-			);
-			log.info(
-				{
-					event: "embedding_completed",
-					count: embeddings.length,
-					model: embeddingService.modelName,
-					durationMs: Math.round(performance.now() - embedStarted),
-				},
-				"embedded child chunks",
+				"semantic chunking complete",
 			);
 
 			const parentRows = parents.map((parent) => ({
@@ -102,10 +91,10 @@ export class IngestPipeline {
 				embedding: null,
 				embeddingModel: null,
 				isActive: true,
-				metadata: parent.metadata,
+				metadata: { ...parent.metadata, title },
 			}));
 
-			const childRows = children.map((child, index) => ({
+			const childRows = children.map((child) => ({
 				id: child.id,
 				documentId,
 				tenantId,
@@ -113,10 +102,10 @@ export class IngestPipeline {
 				content: child.content,
 				chunkIndex: child.chunkIndex,
 				pageNum: child.pageNum,
-				embedding: embeddings[index] ?? null,
+				embedding: child.embedding ?? null,
 				embeddingModel: embeddingService.modelName,
 				isActive: true,
-				metadata: child.metadata,
+				metadata: { ...child.metadata, title },
 			}));
 
 			const writeStarted = performance.now();

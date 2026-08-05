@@ -16,7 +16,9 @@
     "db:studio": "bun --cwd packages/db db:studio",
     "db:drop": "bun --cwd packages/db db:drop",
     "db:check": "bun --cwd packages/db db:check",
-    "db:up": "bun --cwd packages/db db:up"
+    "db:up": "bun --cwd packages/db db:up",
+    "measure": "bun scripts/measure.ts",
+    "reindex": "bun --cwd apps/worker reindex"
   },
   "devDependencies": {
     "typescript": "^5"

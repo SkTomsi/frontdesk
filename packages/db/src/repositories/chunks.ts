@@ -34,7 +34,22 @@ export interface NewChunk {
 	metadata?: Record<string, unknown>;
 }
 
-function toStoredChunk(row: typeof documentChunks.$inferSelect): StoredChunk {
+type ChunkRow = typeof documentChunks.$inferSelect;
+type ChunkProjection = Pick<
+	ChunkRow,
+	| "id"
+	| "documentId"
+	| "tenantId"
+	| "parentId"
+	| "content"
+	| "chunkIndex"
+	| "pageNum"
+	| "embeddingModel"
+	| "isActive"
+	| "metadata"
+>;
+
+function toStoredChunk(row: ChunkProjection): StoredChunk {
 	return {
 		id: row.id,
 		documentId: row.documentId,
@@ -241,6 +256,26 @@ export class ChunkRepository {
 			},
 			score: row.score,
 		}));
+	}
+
+	async getByIds(ids: string[]): Promise<StoredChunk[]> {
+		if (ids.length === 0) return [];
+		const rows = await this.db
+			.select({
+				id: documentChunks.id,
+				documentId: documentChunks.documentId,
+				tenantId: documentChunks.tenantId,
+				parentId: documentChunks.parentId,
+				content: documentChunks.content,
+				chunkIndex: documentChunks.chunkIndex,
+				pageNum: documentChunks.pageNum,
+				embeddingModel: documentChunks.embeddingModel,
+				isActive: documentChunks.isActive,
+				metadata: documentChunks.metadata,
+			})
+			.from(documentChunks)
+			.where(inArray(documentChunks.id, ids));
+		return rows.map(toStoredChunk);
 	}
 
 	async getParentsByIds(ids: string[]): Promise<StoredChunk[]> {

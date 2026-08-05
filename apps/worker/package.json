@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "bun --hot --no-clear-screen --env-file ../../.env ./src/index.ts",
+    "reindex": "bun --env-file ../../.env ./src/reindex.ts",
     "check-types": "tsc --noEmit"
   },
   "dependencies": {

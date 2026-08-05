@@ -1,11 +1,13 @@
 import { END, StateGraph } from "@langchain/langgraph";
 import type { AgentGraphDeps } from "./deps";
-import { createAssessNode } from "./nodes/assess";
+import { createAssessCompressNode } from "./nodes/assess-compress";
+import { createCitationValidatorNode } from "./nodes/citation-validator";
 import { createClassifyNode } from "./nodes/classify";
 import { createDecomposeNode } from "./nodes/decompose";
 import { createGenerateNode } from "./nodes/generate";
 import { createParentFetchNode } from "./nodes/parent-fetch";
 import { createReformulateNode } from "./nodes/reformulate";
+import { createRerankNode } from "./nodes/rerank";
 import { createRetrieveNode } from "./nodes/retrieve";
 import { AgentState, type AgentStateType } from "./state";
 
@@ -27,25 +29,29 @@ export function assessRouter(
 }
 
 export function buildAgentGraph(deps: AgentGraphDeps) {
-	const graph = new StateGraph(AgentState)
+	return new StateGraph(AgentState)
 		.addNode("classify", createClassifyNode(deps))
 		.addNode("decompose", createDecomposeNode(deps))
 		.addNode("retrieve", createRetrieveNode(deps))
+		.addNode("rerank", createRerankNode(deps))
 		.addNode("parentFetch", createParentFetchNode(deps))
-		.addNode("assess", createAssessNode(deps))
+		.addNode("assessCompress", createAssessCompressNode(deps))
 		.addNode("reformulate", createReformulateNode(deps))
 		.addNode("generate", createGenerateNode(deps))
+		.addNode("citationValidator", createCitationValidatorNode(deps))
 
 		.addEdge("__start__", "classify")
 
 		.addConditionalEdges("classify", classifyRouter)
 		.addEdge("decompose", "retrieve")
-		.addEdge("retrieve", "parentFetch")
-		.addEdge("parentFetch", "assess")
+		.addEdge("retrieve", "rerank")
+		.addEdge("rerank", "parentFetch")
+		.addEdge("parentFetch", "assessCompress")
 
-		.addConditionalEdges("assess", assessRouter)
+		.addConditionalEdges("assessCompress", assessRouter)
 		.addEdge("reformulate", "retrieve")
-		.addEdge("generate", END);
+		.addEdge("generate", "citationValidator")
+		.addEdge("citationValidator", END)
 
-	return graph.compile();
+		.compile();
 }
