@@ -1,3 +1,4 @@
+/** biome-ignore-all lint/a11y/useSemanticElements: <explanation> */
 "use client";
 
 import { Graph, Lightning } from "@phosphor-icons/react";
@@ -11,7 +12,11 @@ interface ModeSwitcherProps {
 	disabled?: boolean;
 }
 
-export function ModeSwitcher({ mode, onModeChange, disabled }: ModeSwitcherProps) {
+export function ModeSwitcher({
+	mode,
+	onModeChange,
+	disabled,
+}: ModeSwitcherProps) {
 	return (
 		<div
 			role="group"

@@ -1,14 +1,13 @@
 import {
-	EmbeddingService,
+	type EmbeddingService,
 	formatContext,
+	type Llm,
 	labelFor,
-	Llm,
 	supportPrompt,
 	TokenTracker,
-	VectorStore,
+	type VectorStore,
 } from "@frontdesk/ai";
-import type { StoredChunk } from "@frontdesk/db";
-import { ChunkRepository } from "@frontdesk/db";
+import type { ChunkRepository, StoredChunk } from "@frontdesk/db";
 import { createLogger } from "@frontdesk/logger";
 import { send } from "./sse";
 
@@ -49,7 +48,12 @@ export async function streamSimpleAnswer(
 		SIMPLE_TOP_K,
 		tenantId,
 	);
-	tracker.record("retrieve", question.length, 0, performance.now() - retrieveStarted);
+	tracker.record(
+		"retrieve",
+		question.length,
+		0,
+		performance.now() - retrieveStarted,
+	);
 
 	const parentIds = [
 		...new Set(
@@ -69,9 +73,8 @@ export async function streamSimpleAnswer(
 		contextChunks = parents;
 	} else {
 		const childIds = results.map((r) => r.document.id);
-		contextChunks = childIds.length > 0
-			? await deps.chunkRepository.getByIds(childIds)
-			: [];
+		contextChunks =
+			childIds.length > 0 ? await deps.chunkRepository.getByIds(childIds) : [];
 	}
 
 	const context = formatContext(contextChunks);
@@ -82,7 +85,7 @@ export async function streamSimpleAnswer(
 			: undefined;
 		return {
 			id: r.document.id,
-			title: parent ? labelFor(parent) : r.document.parentId ?? r.document.id,
+			title: parent ? labelFor(parent) : (r.document.parentId ?? r.document.id),
 			score: r.score,
 		};
 	});
@@ -111,7 +114,12 @@ export async function streamSimpleAnswer(
 			onToken(text);
 		}
 	}
-	tracker.record("generate", prompt.length, answer.length, performance.now() - generateStarted);
+	tracker.record(
+		"generate",
+		prompt.length,
+		answer.length,
+		performance.now() - generateStarted,
+	);
 
 	const usage = tracker.summary();
 	log.info(

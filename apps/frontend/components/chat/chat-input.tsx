@@ -1,8 +1,11 @@
 "use client";
 
-import { useEffect, useRef } from "react";
 import { PaperPlaneRight } from "@phosphor-icons/react";
-import { ModeSwitcher, type RetrievalMode } from "@/components/chat/mode-switcher";
+import { useEffect, useRef } from "react";
+import {
+	ModeSwitcher,
+	type RetrievalMode,
+} from "@/components/chat/mode-switcher";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Kbd } from "@/components/ui/kbd";

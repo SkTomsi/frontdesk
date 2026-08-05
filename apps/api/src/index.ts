@@ -199,7 +199,10 @@ Bun.serve({
 								);
 								send(controller, {
 									type: "error",
-									message: "Something went wrong",
+									message:
+										error instanceof Error
+											? error.message
+											: "Something went wrong",
 								});
 							} finally {
 								controller.close();
@@ -237,7 +240,10 @@ Bun.serve({
 								);
 								send(controller, {
 									type: "error",
-									message: "Something went wrong",
+									message:
+										error instanceof Error
+											? error.message
+											: "Something went wrong",
 								});
 							} finally {
 								controller.close();
